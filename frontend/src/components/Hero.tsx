@@ -6,15 +6,15 @@ const EXAMPLE_QUESTIONS = [
 ];
 
 const PIPELINE_STAGES = [
-  { label: "Query Planning", kind: "llm" },
-  { label: "Retrieval", kind: "ml" },
-  { label: "Ranking", kind: "ml" },
-  { label: "Claim Extraction", kind: "llm" },
-  { label: "Verification", kind: "ml" },
-  { label: "Stance Clustering", kind: "ml" },
-  { label: "Consensus Scoring", kind: "ml" },
-  { label: "Graph Builder", kind: "ml" },
-  { label: "Report Generation", kind: "llm" },
+  { name: "query_planning", kind: "llm" },
+  { name: "retrieval", kind: "model" },
+  { name: "ranking", kind: "model" },
+  { name: "claim_extraction", kind: "llm" },
+  { name: "verification", kind: "model" },
+  { name: "stance_clustering", kind: "model" },
+  { name: "consensus_scoring", kind: "model" },
+  { name: "kg_builder", kind: "model" },
+  { name: "report_generation", kind: "llm" },
 ];
 
 interface Props {
@@ -24,28 +24,43 @@ interface Props {
 export default function Hero({ onExample }: Props) {
   return (
     <div className="hero">
-      <div className="hero-pipeline" aria-hidden="true">
-        {PIPELINE_STAGES.map((stage, i) => (
-          <div className="hero-pipeline-item" key={stage.label} style={{ animationDelay: `${i * 90}ms` }}>
-            <span className={`hero-node hero-node-${stage.kind}`} />
-            <span className="hero-node-label">{stage.label}</span>
-            {i < PIPELINE_STAGES.length - 1 && <span className="hero-node-connector" />}
+      <div className="term-block">
+        <div className="term-block-title">
+          <span>$ ps --agents</span>
+        </div>
+        <div className="term-table">
+          <div className="term-row term-row-head">
+            <span className="col-pid">PID</span>
+            <span className="col-name">AGENT</span>
+            <span className="col-kind">SOURCE</span>
+            <span className="col-state">STATE</span>
           </div>
-        ))}
+          {PIPELINE_STAGES.map((stage, i) => (
+            <div className="term-row" key={stage.name}>
+              <span className="col-pid">{String(i + 1).padStart(2, "0")}</span>
+              <span className="col-name">{stage.name}</span>
+              <span className={`col-kind kind-${stage.kind}`}>{stage.kind}</span>
+              <span className="col-state">
+                <i className="state-dot" />
+                idle
+              </span>
+            </div>
+          ))}
+        </div>
       </div>
 
-      <div className="hero-examples">
-        <span className="hero-examples-label">Try one:</span>
-        {EXAMPLE_QUESTIONS.map((q) => (
-          <button key={q} className="hero-chip" onClick={() => onExample(q)}>
-            {q}
-          </button>
-        ))}
-      </div>
-
-      <div className="hero-legend">
-        <span><i className="hero-legend-dot hero-node-ml" /> trained model judgment</span>
-        <span><i className="hero-legend-dot hero-node-llm" /> LLM phrasing only</span>
+      <div className="term-block">
+        <div className="term-block-title">
+          <span>$ history --sample</span>
+        </div>
+        <div className="term-history">
+          {EXAMPLE_QUESTIONS.map((q, i) => (
+            <button key={q} className="term-history-item" onClick={() => onExample(q)}>
+              <span className="history-index">{482 + i}</span>
+              <span className="history-text">{q}</span>
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );

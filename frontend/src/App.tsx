@@ -38,17 +38,22 @@ function App() {
 
   return (
     <div className="app">
-      <div className="bg-glow" aria-hidden="true" />
+      <div className="term-chrome">
+        <span className="term-dot term-dot-r" />
+        <span className="term-dot term-dot-y" />
+        <span className="term-dot term-dot-g" />
+        <span className="term-chrome-title">guest@infera: ~/research</span>
+      </div>
 
       <header className={`app-header ${showLanding ? "app-header-landing" : ""}`}>
         <div className="brand">
-          <span className="brand-mark">infera</span>
-          <span className="brand-badge">multi-agent research</span>
+          <span className="brand-mark">infera<span className="brand-cursor" /></span>
+          <span className="brand-badge">multi&#8209;agent research</span>
         </div>
         {showLanding && (
           <p className="tagline">
-            Ask a research question. Trained models — not LLM opinion — decide relevance,
-            verification, and consensus. The LLM only phrases the report.
+            Trained models decide relevance, verification, and consensus. The
+            language model only phrases the report.
           </p>
         )}
       </header>
@@ -63,6 +68,16 @@ function App() {
       {error && <div className="error-banner">{error}</div>}
 
       {showLanding && <Hero onExample={(q) => { setPrefill(q); handleSubmit(q); }} />}
+
+      {showLanding && (
+        <div className="status-bar">
+          <span>infera v0.1.0</span>
+          <span>9 agents registered</span>
+          <span>retrieval: semantic-scholar + arxiv</span>
+          <span>verify: nli</span>
+          <span>rank: lightgbm</span>
+        </div>
+      )}
 
       {loading && (
         <div className="panel panel-loading">

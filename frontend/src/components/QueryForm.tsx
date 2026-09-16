@@ -14,19 +14,17 @@ export default function QueryForm({ onSubmit, loading, value, onChange }: Props)
   return (
     <form className="query-form" onSubmit={handleSubmit}>
       <div className="query-form-inner">
-        <svg className="query-icon" width="18" height="18" viewBox="0 0 24 24" fill="none">
-          <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
-          <path d="M21 21l-4.3-4.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-        </svg>
+        <span className="prompt-prefix">research@infera:~$</span>
         <input
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="Ask a research question, e.g. Does creatine supplementation improve cognitive performance?"
+          placeholder="ask a research question…"
           disabled={loading}
+          autoFocus
         />
         <button type="submit" disabled={loading || !value.trim()}>
-          {loading ? "Researching…" : "Research"}
+          {loading ? "running…" : "run ↵"}
         </button>
       </div>
     </form>
