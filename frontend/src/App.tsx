@@ -1,5 +1,6 @@
 import { useState } from "react";
 import QueryForm from "./components/QueryForm";
+import Hero from "./components/Hero";
 import PipelineTrace from "./components/PipelineTrace";
 import ConsensusPanel from "./components/ConsensusPanel";
 import ReportView from "./components/ReportView";
@@ -17,6 +18,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("report");
+  const [prefill, setPrefill] = useState("");
 
   const handleSubmit = async (question: string) => {
     setLoading(true);
@@ -32,23 +34,41 @@ function App() {
     }
   };
 
+  const showLanding = !result && !loading;
+
   return (
     <div className="app">
-      <header className="app-header">
-        <h1>Infera</h1>
-        <p className="tagline">
-          Multi-agent research consensus engine — evidence-strength and controversy scores
-          come from a trained NLI model and learned ranker, not LLM opinion.
-        </p>
+      <div className="bg-glow" aria-hidden="true" />
+
+      <header className={`app-header ${showLanding ? "app-header-landing" : ""}`}>
+        <div className="brand">
+          <span className="brand-mark">infera</span>
+          <span className="brand-badge">multi-agent research</span>
+        </div>
+        {showLanding && (
+          <p className="tagline">
+            Ask a research question. Trained models — not LLM opinion — decide relevance,
+            verification, and consensus. The LLM only phrases the report.
+          </p>
+        )}
       </header>
 
-      <QueryForm onSubmit={handleSubmit} loading={loading} />
+      <QueryForm
+        onSubmit={handleSubmit}
+        loading={loading}
+        value={prefill}
+        onChange={setPrefill}
+      />
 
       {error && <div className="error-banner">{error}</div>}
 
+      {showLanding && <Hero onExample={(q) => { setPrefill(q); handleSubmit(q); }} />}
+
       {loading && (
-        <div className="panel">
-          <h2>Running pipeline…</h2>
+        <div className="panel panel-loading">
+          <h2>
+            <span className="spinner" /> Running pipeline…
+          </h2>
           <PipelineTrace trace={result?.trace ?? []} />
         </div>
       )}
