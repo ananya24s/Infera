@@ -88,9 +88,18 @@ Generation fall back to rule-based/template behavior — the ML-judgment agents
 (Retrieval, Ranking, Verification, Stance Clustering, Consensus Scoring, KG
 Builder) are unaffected, since they never depend on the LLM.
 
-The NLI model and sentence-transformer embedder download from HuggingFace on
-first use. The LightGBM ranker falls back to a transparent fixed-weight linear
-score until you train one with `training/train_ranker.py`.
+The NLI model and sentence-transformer embedder are loaded once at server
+**startup** (not lazily on the first request) so the first real user doesn't
+pay for the HuggingFace download — this means `uvicorn` takes a while to
+report "Application startup complete" the first time, which is expected.
+The LightGBM ranker falls back to a transparent fixed-weight linear score
+until you train one with `training/train_ranker.py`.
+
+`/api/research` is rate-limited per client IP (10 requests/hour by default —
+tune with `INFERA_RATE_LIMIT_MAX_REQUESTS` / `INFERA_RATE_LIMIT_WINDOW_S`).
+The limiter is in-memory, so it only enforces correctly within a single
+process — see `app/rate_limit.py` if this ever needs to run as more than
+one instance.
 
 ### Frontend
 
@@ -108,6 +117,27 @@ Defaults to `http://localhost:8000` for the API; override with `VITE_API_BASE`.
 cd backend
 pytest
 ```
+
+## Deploying
+
+The backend **must run as a persistent process, not a serverless function** —
+each query costs multiple seconds of CPU-bound model inference, and models
+are loaded once at startup, which serverless cold-starts would repeat on
+every invocation. A small VPS, or a PaaS that keeps a process running
+(Render, Railway, Fly.io), works; the frontend build is a static site and
+can go anywhere (Vercel, Netlify, S3 — anything that serves `dist/`).
+
+Before deploying:
+- Set `INFERA_ALLOWED_ORIGINS` to the frontend's real deployed origin (CORS
+  defaults to `localhost:5173` for local dev and will otherwise silently
+  reject the deployed frontend's requests).
+- Set `VITE_API_BASE` at frontend build time to the backend's real deployed URL.
+- Put `ANTHROPIC_API_KEY` (if used) and `INFERA_OPENALEX_CONTACT_EMAIL` in
+  the host's secret/env config — `backend/.env` is for local dev only and is
+  gitignored.
+- Confirm the rate-limit defaults (`INFERA_RATE_LIMIT_MAX_REQUESTS` /
+  `_WINDOW_S`) fit expected traffic; each request is compute-heavy and, with
+  an LLM key set, also costs real API spend.
 
 ## Training the models
 

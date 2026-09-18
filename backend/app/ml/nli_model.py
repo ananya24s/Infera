@@ -30,6 +30,11 @@ def _pipeline():
     return pipeline("text-classification", model=settings.nli_model_name, top_k=None)
 
 
+def warmup() -> None:
+    """Force the NLI checkpoint to load now rather than on the first request."""
+    _pipeline()
+
+
 _LABEL_MAP = {
     "entailment": VerificationLabel.SUPPORTS,
     "supports": VerificationLabel.SUPPORTS,

@@ -1,19 +1,24 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.config import get_settings
 from app.models.schemas import ResearchRequest, ResearchResponse
 from app.orchestrator.orchestrator import build_default_pipeline
 from app.orchestrator.state import ResearchState
+from app.rate_limit import enforce_rate_limit
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Infera", description="Multi-agent research consensus platform")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=get_settings().allowed_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -28,12 +33,31 @@ def get_pipeline():
     return _pipeline
 
 
+@app.on_event("startup")
+async def warmup_models() -> None:
+    """Load the NLI checkpoint and embedding model now, not on the first
+    request — otherwise the first real user pays for the (multi-minute, on
+    a cold cache) HuggingFace download and model load."""
+    from app.ml import nli_model
+    from app.services import hybrid_search
+
+    logger.info("Warming up models...")
+    get_pipeline()
+    await asyncio.to_thread(nli_model.warmup)
+    await asyncio.to_thread(hybrid_search.warmup)
+    logger.info("Model warmup complete.")
+
+
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok"}
 
 
-@app.post("/api/research", response_model=ResearchResponse)
+@app.post(
+    "/api/research",
+    response_model=ResearchResponse,
+    dependencies=[Depends(enforce_rate_limit)],
+)
 async def research(req: ResearchRequest) -> ResearchResponse:
     state = ResearchState(
         question=req.question,

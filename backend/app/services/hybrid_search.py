@@ -40,6 +40,11 @@ def _embedder():
     return SentenceTransformer(settings.embedding_model_name)
 
 
+def warmup() -> None:
+    """Force the embedding model to load now rather than on the first request."""
+    _embedder()
+
+
 @dataclass
 class HybridIndex:
     papers: list[Paper]
