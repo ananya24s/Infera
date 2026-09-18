@@ -1,14 +1,28 @@
-"""Thin client for the arXiv Atom API."""
+"""Thin client for the arXiv Atom API.
+
+Uses `requests` rather than httpx: arxiv.org's edge intermittently returns
+406 to httpx's TLS/handshake fingerprint specifically (reproduced with
+identical headers and both HTTP/1.1 and HTTP/2 — httpx still gets blocked
+while `requests` and plain `curl` are consistently accepted), so httpx isn't
+usable here.
+"""
 from __future__ import annotations
 
+import asyncio
 from xml.etree import ElementTree as ET
 
-import httpx
+import requests
 
 from app.config import get_settings
 from app.models.schemas import Paper
 
 ATOM_NS = "{http://www.w3.org/2005/Atom}"
+
+
+def _fetch(url: str, params: dict, timeout: float) -> str:
+    resp = requests.get(url, params=params, timeout=timeout)
+    resp.raise_for_status()
+    return resp.text
 
 
 async def search(query: str, limit: int = 20) -> list[Paper]:
@@ -20,10 +34,9 @@ async def search(query: str, limit: int = 20) -> list[Paper]:
         "sortBy": "relevance",
         "sortOrder": "descending",
     }
-    async with httpx.AsyncClient(timeout=settings.request_timeout_s) as client:
-        resp = await client.get(settings.arxiv_base_url, params=params)
-        resp.raise_for_status()
-        xml_text = resp.text
+    xml_text = await asyncio.to_thread(
+        _fetch, settings.arxiv_base_url, params, settings.request_timeout_s
+    )
 
     root = ET.fromstring(xml_text)
     papers: list[Paper] = []

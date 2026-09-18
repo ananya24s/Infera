@@ -612,6 +612,9 @@
 }
 .kg-legend .line.supports { background: var(--accent); }
 .kg-legend .line.contradicts { background: #e03131; }
+.kg-legend .line.cites {
+  background: repeating-linear-gradient(to right, #868e96 0 4px, transparent 4px 7px);
+}
 
 .kg-canvas {
   width: 100%;

@@ -129,6 +129,8 @@ explicitly not a substitute for real judgments.
 - **Stretch (not implemented):** concept-level entity linking.
 - **Out of scope:** research gap detection.
 
-`cites` paper→paper edges are defined in the KG schema but not yet populated —
-wiring them up needs an extra Semantic Scholar references/citations call per
-paper, deliberately left out of the initial scope.
+`cites` paper→paper edges come from Semantic Scholar's `references` field,
+requested inline on the same `/paper/search` call (no extra API round-trip
+per paper) and surfaced only where both the citing and cited paper are in
+the current retrieved set. arXiv's Atom API has no citation graph, so
+arXiv-sourced papers never appear as a `cites` edge's source.

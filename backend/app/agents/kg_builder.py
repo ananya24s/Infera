@@ -12,6 +12,8 @@ def run(state: ResearchState) -> None:
     nodes: list[KGNode] = []
     edges: list[KGEdge] = []
 
+    paper_ids = {paper.paper_id for paper in state.papers}
+
     for paper in state.papers:
         nodes.append(
             KGNode(
@@ -28,6 +30,19 @@ def run(state: ResearchState) -> None:
                 },
             )
         )
+        # Only surface citation edges between papers we actually retrieved —
+        # a paper's full reference list is mostly papers outside our set, and
+        # those wouldn't have nodes to point at.
+        for ref_id in paper.references:
+            if ref_id in paper_ids and ref_id != paper.paper_id:
+                edges.append(
+                    KGEdge(
+                        id=f"e_cites_{paper.paper_id}_{ref_id}",
+                        source=paper.paper_id,
+                        target=ref_id,
+                        type="cites",
+                    )
+                )
 
     label_to_edge_type = {
         VerificationLabel.SUPPORTS: "supports",

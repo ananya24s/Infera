@@ -10,7 +10,7 @@ from pydantic import BaseModel
 class Settings(BaseModel):
     # External retrieval APIs (no key required for low-volume use; set for higher rate limits)
     semantic_scholar_api_key: str | None = os.getenv("SEMANTIC_SCHOLAR_API_KEY")
-    arxiv_base_url: str = "http://export.arxiv.org/api/query"
+    arxiv_base_url: str = "https://export.arxiv.org/api/query"
     semantic_scholar_base_url: str = "https://api.semanticscholar.org/graph/v1"
 
     # LLM used ONLY for phrasing help (report drafting) and claim segmentation assistance.

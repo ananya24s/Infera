@@ -7,6 +7,7 @@ normalized title across sub-questions.
 from __future__ import annotations
 
 import asyncio
+import logging
 
 from app.config import get_settings
 from app.models.schemas import Paper
@@ -15,19 +16,24 @@ from app.services import arxiv, semantic_scholar
 from app.services.hybrid_search import HybridIndex
 
 
+logger = logging.getLogger(__name__)
+
+
 def _norm_title(title: str) -> str:
     return "".join(c.lower() for c in title if c.isalnum())
 
 
 async def _fetch_pool(query: str, per_source: int) -> list[Paper]:
+    sources = ("semantic_scholar", "arxiv")
     results = await asyncio.gather(
         semantic_scholar.search(query, limit=per_source),
         arxiv.search(query, limit=per_source),
         return_exceptions=True,
     )
     pool: list[Paper] = []
-    for r in results:
+    for source, r in zip(sources, results):
         if isinstance(r, Exception):
+            logger.warning("retrieval: %s failed for query %r: %r", source, query, r)
             continue
         pool.extend(r)
     return pool

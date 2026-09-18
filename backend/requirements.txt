@@ -2,6 +2,7 @@ fastapi>=0.115
 uvicorn[standard]>=0.32
 pydantic>=2.9
 httpx>=0.27
+requests>=2.31  # arxiv.py only — httpx gets 406'd by arxiv.org's edge, requests doesn't
 
 sentence-transformers>=3.2
 faiss-cpu>=1.9

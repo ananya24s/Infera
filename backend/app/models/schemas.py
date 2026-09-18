@@ -26,6 +26,11 @@ class Paper(BaseModel):
     url: Optional[str] = None
     source: str = "semantic_scholar"  # semantic_scholar | arxiv
 
+    # paper_ids (same scheme as Paper.paper_id, e.g. "s2:<id>") this paper cites,
+    # as reported by the source API. Only populated for Semantic Scholar papers —
+    # arXiv's Atom API doesn't expose a citation graph.
+    references: list[str] = Field(default_factory=list)
+
     # populated by the ranking agent
     relevance_score: float = 0.0
     credibility_score: float = 0.0

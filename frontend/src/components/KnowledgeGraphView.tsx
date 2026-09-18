@@ -69,6 +69,14 @@ export default function KnowledgeGraphView({ graph }: { graph: KnowledgeGraph })
             opacity: 0.75,
           },
         },
+        {
+          selector: 'edge[type = "cites"]',
+          style: { "line-style": "dashed", opacity: 0.5 },
+        },
+        {
+          selector: 'edge[type = "extracted_from"]',
+          style: { "target-arrow-shape": "none", opacity: 0.35 },
+        },
       ],
       layout: { name: "cose-bilkent", animate: false } as cytoscape.LayoutOptions,
     });
@@ -84,6 +92,7 @@ export default function KnowledgeGraphView({ graph }: { graph: KnowledgeGraph })
         <span><i className="dot claim" /> claim</span>
         <span><i className="line supports" /> supports</span>
         <span><i className="line contradicts" /> contradicts</span>
+        <span><i className="line cites" /> cites</span>
       </div>
       <div ref={containerRef} className="kg-canvas" />
     </div>
