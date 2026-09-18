@@ -8,10 +8,11 @@ from pydantic import BaseModel
 
 
 class Settings(BaseModel):
-    # External retrieval APIs (no key required for low-volume use; set for higher rate limits)
-    semantic_scholar_api_key: str | None = os.getenv("SEMANTIC_SCHOLAR_API_KEY")
+    # External retrieval APIs — both are free and keyless.
     arxiv_base_url: str = "https://export.arxiv.org/api/query"
-    semantic_scholar_base_url: str = "https://api.semanticscholar.org/graph/v1"
+    # Optional: any email, no verification. Moves OpenAlex requests into their
+    # faster "polite pool" — see https://docs.openalex.org/how-to-use-the-api/rate-limits-and-authentication
+    openalex_contact_email: str | None = os.getenv("INFERA_OPENALEX_CONTACT_EMAIL")
 
     # LLM used ONLY for phrasing help (report drafting) and claim segmentation assistance.
     # Judgments (ranking/verification/consensus) never come from this model.

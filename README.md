@@ -11,7 +11,7 @@ supporting/contradicting evidence graph.
 ```
 Query Planning        → splits the question into sub-questions (LLM-assisted, rule-based fallback)
 Retrieval              → hybrid dense (sentence-transformers + FAISS) + sparse (BM25) search
-                          over papers pulled live from Semantic Scholar + arXiv
+                          over papers pulled live from OpenAlex + arXiv
 Ranking                → LightGBM-learned relevance/credibility score over hybrid-search +
                           citation-graph metadata features
 Claim Extraction       → atomic claims pulled from top-ranked abstracts (LLM segmentation help)
@@ -34,9 +34,9 @@ segmentation help; it never scores relevance, credibility, entailment, or
 consensus.
 
 **No fabricated data.** Training data is SciFact/FEVER (real, public
-fact-verification datasets); live retrieval is real API calls to Semantic
-Scholar and arXiv. There are no synthetic papers or invented citations
-anywhere in the pipeline.
+fact-verification datasets); live retrieval is real API calls to OpenAlex
+and arXiv. There are no synthetic papers or invented citations anywhere in
+the pipeline.
 
 ## Architecture
 
@@ -55,7 +55,7 @@ backend/
     orchestrator/         ResearchState + the sequential Orchestrator
     agents/                one module per pipeline stage, each a `run(state)` function
     ml/                    NLI wrapper, LightGBM ranker, HDBSCAN clustering
-    services/              Semantic Scholar / arXiv clients, hybrid search, scoped LLM client
+    services/              OpenAlex / arXiv clients, hybrid search, scoped LLM client
     models/schemas.py      pydantic models shared by the API and the pipeline
   training/
     train_nli.py           fine-tunes an NLI checkpoint on the real allenai/scifact dataset
@@ -120,7 +120,7 @@ fine-tunes a FEVER-pretrained checkpoint on the real `allenai/scifact` dataset
 --input judgments.csv` trains on real graded-relevance judgments you supply
 (see the script's docstring for the CSV schema). A `--source citation` mode
 is also provided as a documented *weak-supervision* fallback — it derives noisy
-labels from Semantic Scholar's citation graph and hybrid-search rank, and is
+labels from OpenAlex's citation graph and hybrid-search rank, and is
 explicitly not a substitute for real judgments.
 
 ## Scope
@@ -129,8 +129,18 @@ explicitly not a substitute for real judgments.
 - **Stretch (not implemented):** concept-level entity linking.
 - **Out of scope:** research gap detection.
 
-`cites` paper→paper edges come from Semantic Scholar's `references` field,
-requested inline on the same `/paper/search` call (no extra API round-trip
-per paper) and surfaced only where both the citing and cited paper are in
-the current retrieved set. arXiv's Atom API has no citation graph, so
+`cites` paper→paper edges come from OpenAlex's `referenced_works` field,
+requested inline on the same search call (no extra API round-trip per
+paper) and surfaced only where both the citing and cited paper are in the
+current retrieved set. arXiv's Atom API has no citation graph, so
 arXiv-sourced papers never appear as a `cites` edge's source.
+
+## Why OpenAlex instead of Semantic Scholar
+
+The original design used the Semantic Scholar Graph API. Its unauthenticated
+tier turned out to be rate-limited too aggressively to be usable in practice
+(every request 429'd, including retries minutes apart), and requesting a key
+requires an institutional/edu email. OpenAlex is a fully open, keyless
+alternative with no rate-limit wall and broader coverage — including the
+biomedical/nutrition journals arXiv doesn't index — so it replaced S2 as the
+second retrieval source.

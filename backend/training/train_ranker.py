@@ -8,11 +8,11 @@ fabricate labels. Two supported label sources, chosen with --source:
             relevance_label (0-3 graded relevance, e.g. from human judgments
             or a query log with click-through / dwell-time derived grades).
 
-  citation  Weak-supervision from Semantic Scholar's own citation graph: for
-            a list of seed queries, treats a paper's top S2 hybrid-search
-            rank position + citation count as a noisy relevance proxy. This
-            is documented as WEAK supervision (not ground truth) — use --source
-            csv with real judgments for a production model.
+  citation  Weak-supervision from OpenAlex's own citation graph: for a list
+            of seed queries, treats a paper's hybrid-search rank position +
+            citation count as a noisy relevance proxy. This is documented as
+            WEAK supervision (not ground truth) — use --source csv with real
+            judgments for a production model.
 
 Usage:
     python -m training.train_ranker --source csv --input judgments.csv --output ./data/ranker.lgb
@@ -78,12 +78,12 @@ async def _features_and_labels_from_citation_graph(
     This is a noisy proxy, not human judgment — prefer --source csv.
     """
     from app.ml.ranker import RankFeatures
-    from app.services import semantic_scholar
+    from app.services import openalex
     from app.services.hybrid_search import HybridIndex
 
     X, y = [], []
     for query in queries:
-        papers = await semantic_scholar.search(query, limit=per_query)
+        papers = await openalex.search(query, limit=per_query)
         if len(papers) < 3:
             continue
         index = HybridIndex(papers=papers)

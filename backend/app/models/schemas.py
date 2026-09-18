@@ -24,10 +24,10 @@ class Paper(BaseModel):
     influential_citation_count: int = 0
     is_open_access: bool = False
     url: Optional[str] = None
-    source: str = "semantic_scholar"  # semantic_scholar | arxiv
+    source: str = "openalex"  # openalex | arxiv
 
-    # paper_ids (same scheme as Paper.paper_id, e.g. "s2:<id>") this paper cites,
-    # as reported by the source API. Only populated for Semantic Scholar papers —
+    # paper_ids (same scheme as Paper.paper_id, e.g. "openalex:<id>") this paper
+    # cites, as reported by the source API. Only populated for OpenAlex papers —
     # arXiv's Atom API doesn't expose a citation graph.
     references: list[str] = Field(default_factory=list)
 

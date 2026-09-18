@@ -1,8 +1,8 @@
 """Retrieval agent: hybrid dense+BM25 search over papers pulled live from
-Semantic Scholar and arXiv (no fabricated/synthetic papers). For each
-sub-question, fetches a candidate pool from both APIs, then runs hybrid
-search over the pool to keep the top matches. Papers are deduplicated by
-normalized title across sub-questions.
+OpenAlex and arXiv (no fabricated/synthetic papers). For each sub-question,
+fetches a candidate pool from both APIs, then runs hybrid search over the
+pool to keep the top matches. Papers are deduplicated by normalized title
+across sub-questions.
 """
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ import logging
 from app.config import get_settings
 from app.models.schemas import Paper
 from app.orchestrator.state import ResearchState
-from app.services import arxiv, semantic_scholar
+from app.services import arxiv, openalex
 from app.services.hybrid_search import HybridIndex
 
 
@@ -24,9 +24,9 @@ def _norm_title(title: str) -> str:
 
 
 async def _fetch_pool(query: str, per_source: int) -> list[Paper]:
-    sources = ("semantic_scholar", "arxiv")
+    sources = ("openalex", "arxiv")
     results = await asyncio.gather(
-        semantic_scholar.search(query, limit=per_source),
+        openalex.search(query, limit=per_source),
         arxiv.search(query, limit=per_source),
         return_exceptions=True,
     )
