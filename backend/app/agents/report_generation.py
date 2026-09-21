@@ -12,12 +12,20 @@ to a template report (no LLM) when no API key is configured.
 from __future__ import annotations
 
 import asyncio
+import json
+import logging
 import re
 
 from app.models.schemas import ResearchReport, VerificationLabel
 from app.ml.nli_model import verify
 from app.orchestrator.state import ResearchState
-from app.services.llm_client import complete, llm_enabled
+from app.services.llm_client import complete, llm_description, llm_enabled
+
+logger = logging.getLogger(__name__)
+
+# How many of the closest-matching claims to use as the premise when re-checking a
+# report sentence. Keeps the NLI input well under the model's token limit.
+_EVIDENCE_TOP_K = 5
 
 DRAFT_SYSTEM_PROMPT = (
     "You are a scientific research assistant writing a short evidence report. "
@@ -85,13 +93,22 @@ def _split_sentences(markdown: str) -> list[str]:
     return [s.strip() for s in re.split(r"(?<=[.!?])\s+", plain) if len(s.split()) >= 5]
 
 
-def _pooled_evidence_for(state: ResearchState, sub_question_id: str | None) -> str:
-    texts = [
-        c.text
-        for c in state.claims
-        if c.sub_question_id == sub_question_id and state.verdict_by_claim(c.id)
-    ]
-    return " ".join(texts)
+def _evidence_for_sentence(state: ResearchState, sentence: str, sub_question_id: str | None) -> str:
+    """The claims (from this sub-question) most similar to the sentence, joined
+    as the NLI premise. Using the closest few rather than everything keeps the
+    premise relevant and short enough for the model."""
+    import numpy as np
+
+    from app.services.hybrid_search import _embedder
+
+    pool = [c for c in state.claims if c.sub_question_id == sub_question_id and state.verdict_by_claim(c.id)]
+    if not pool:
+        return ""
+    embedder = _embedder()
+    vecs = embedder.encode([sentence] + [c.text for c in pool], normalize_embeddings=True, show_progress_bar=False)
+    sims = np.asarray(vecs[1:]) @ np.asarray(vecs[0])
+    top = np.argsort(-sims)[:_EVIDENCE_TOP_K]
+    return " ".join(pool[i].text for i in top)
 
 
 def _closest_sub_question(state: ResearchState, sentence: str) -> str | None:
@@ -109,16 +126,16 @@ async def _self_check_and_revise(state: ResearchState, draft: str) -> tuple[str,
     flagged = []
     for sentence in sentences:
         sub_q_id = _closest_sub_question(state, sentence)
-        pooled_evidence = _pooled_evidence_for(state, sub_q_id)
-        if not pooled_evidence:
+        evidence = _evidence_for_sentence(state, sentence, sub_q_id)
+        if not evidence:
             continue
-        result = verify(premise=pooled_evidence, hypothesis=sentence)
+        result = verify(premise=evidence, hypothesis=sentence)
         if result.label != VerificationLabel.SUPPORTS:
             flagged.append(
                 {
                     "original": sentence,
                     "reason": result.label.value,
-                    "evidence": pooled_evidence[:1000],
+                    "evidence": evidence[:1000],
                 }
             )
 
@@ -129,12 +146,15 @@ async def _self_check_and_revise(state: ResearchState, draft: str) -> tuple[str,
         notes = [f"Flagged (not auto-revised, no LLM configured): {f['original']}" for f in flagged]
         return draft, True, notes
 
-    import json
-
     prompt = json.dumps(flagged, indent=2)
-    raw = await complete(REVISE_SYSTEM_PROMPT, prompt, max_tokens=800)
-    match = re.search(r"\[.*\]", raw, re.DOTALL)
-    revisions = json.loads(match.group(0)) if match else []
+    try:
+        raw = await complete(REVISE_SYSTEM_PROMPT, prompt, max_tokens=800)
+        match = re.search(r"\[.*\]", raw, re.DOTALL)
+        revisions = json.loads(match.group(0)) if match else []
+    except Exception as exc:  # noqa: BLE001 - keep the draft; just record what was flagged
+        logger.warning("report_generation: revision step failed (%r); keeping draft", exc)
+        notes = [f"Flagged (auto-revision failed): {f['original']}" for f in flagged]
+        return draft, True, notes
 
     revised_draft = draft
     notes = []
@@ -163,11 +183,15 @@ async def _generate(state: ResearchState) -> ResearchReport:
         body_markdown=final_body,
         revised=revised,
         revision_notes=notes,
+        generated_by=llm_description(),
     )
 
 
 def run(state: ResearchState) -> None:
     if llm_enabled():
-        state.report = asyncio.run(_generate(state))
-    else:
-        state.report = _template_report(state)
+        try:
+            state.report = asyncio.run(_generate(state))
+            return
+        except Exception as exc:  # noqa: BLE001 - LLM is phrasing help only; never fail the query over it
+            logger.warning("report_generation: LLM draft failed (%r); using template report", exc)
+    state.report = _template_report(state)

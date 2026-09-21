@@ -35,9 +35,14 @@ class Settings(BaseModel):
 
     # LLM used ONLY for phrasing help (report drafting) and claim segmentation assistance.
     # Judgments (ranking/verification/consensus) never come from this model.
-    llm_provider: str = os.getenv("INFERA_LLM_PROVIDER", "anthropic")
+    # auto | ollama | anthropic | none — see app/services/llm_client.py
+    llm_provider: str = (os.getenv("INFERA_LLM_PROVIDER") or "auto").lower()
     anthropic_api_key: str | None = os.getenv("ANTHROPIC_API_KEY") or None
-    llm_model: str = os.getenv("INFERA_LLM_MODEL", "claude-sonnet-5")
+    llm_model: str = os.getenv("INFERA_LLM_MODEL") or "claude-sonnet-5"
+    # Local, free LLM via Ollama (https://ollama.com).
+    ollama_base_url: str = os.getenv("INFERA_OLLAMA_URL") or "http://localhost:11434"
+    ollama_model: str = os.getenv("INFERA_OLLAMA_MODEL") or "qwen2.5:7b"
+    ollama_timeout_s: float = _env_float("INFERA_OLLAMA_TIMEOUT_S", 180.0)
 
     # Trained-model checkpoints
     nli_model_name: str = os.getenv(

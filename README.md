@@ -80,7 +80,7 @@ cd backend
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env   # fill in ANTHROPIC_API_KEY (optional — see below)
-uvicorn app.main:app --reload --port 8000
+uvicorn app.main:app --reload --port 8001
 ```
 
 Without `ANTHROPIC_API_KEY` set, Query Planning, Claim Extraction, and Report
@@ -109,7 +109,7 @@ npm install
 npm run dev
 ```
 
-Defaults to `http://localhost:8000` for the API; override with `VITE_API_BASE`.
+Defaults to `http://localhost:8001` for the API; override with `VITE_API_BASE`.
 
 ### Tests
 

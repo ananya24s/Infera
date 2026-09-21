@@ -50,7 +50,8 @@ def verify(premise: str, hypothesis: str) -> NLIResult:
     clf = _pipeline()
     # Most NLI checkpoints expect "premise </s></s> hypothesis" style pairing;
     # the HF pipeline handles this via text_pair.
-    outputs = clf({"text": premise, "text_pair": hypothesis})
+    # only_first truncates the premise (evidence), never the claim being checked.
+    outputs = clf({"text": premise, "text_pair": hypothesis}, truncation="only_first", max_length=512)
     if outputs and isinstance(outputs[0], list):
         outputs = outputs[0]
 

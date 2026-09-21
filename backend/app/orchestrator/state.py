@@ -53,6 +53,41 @@ class ResearchState:
         return next((v for v in self.verdicts if v.claim_id == claim_id), None)
 
 
+def _plural(n: int, word: str) -> str:
+    return f"{n} {word}{'' if n == 1 else 's'}"
+
+
+def _verification_summary(s: "ResearchState") -> str:
+    counts = {"SUPPORTS": 0, "REFUTES": 0, "NOT_ENOUGH_INFO": 0}
+    for v in s.verdicts:
+        counts[v.label.value] += 1
+    return f"{counts['SUPPORTS']} supports / {counts['REFUTES']} refutes / {counts['NOT_ENOUGH_INFO']} nei"
+
+
+# Short human-readable result of each stage, shown in the live progress view.
+_SUMMARIES = {
+    "query_planning": lambda s: _plural(len(s.sub_questions), "sub-question"),
+    "retrieval": lambda s: _plural(len(s.papers), "paper"),
+    "ranking": lambda s: f"top score {s.papers[0].final_score:.2f}" if s.papers else "no papers",
+    "claim_extraction": lambda s: _plural(len(s.claims), "claim"),
+    "verification": _verification_summary,
+    "stance_clustering": lambda s: _plural(len(s.clusters), "cluster"),
+    "consensus_scoring": lambda s: _plural(len(s.consensus), "sub-question") + " scored",
+    "kg_builder": lambda s: f"{len(s.knowledge_graph.nodes)} nodes, {len(s.knowledge_graph.edges)} edges",
+    "report_generation": lambda s: (
+        f"{s.report.generated_by}" + (f", {len(s.report.revision_notes)} revision(s)" if s.report.revised else "")
+        if s.report else ""
+    ),
+}
+
+
+def _summarize(name: str, state: "ResearchState") -> str:
+    try:
+        return _SUMMARIES[name](state) if name in _SUMMARIES else ""
+    except Exception:  # noqa: BLE001 - a cosmetic summary must never break the pipeline
+        return ""
+
+
 class AgentStep:
     """Wraps a single pipeline stage so the orchestrator can trace it uniformly."""
 
@@ -73,5 +108,10 @@ class AgentStep:
         else:
             duration_ms = (time.perf_counter() - start) * 1000
             state.trace.append(
-                AgentTrace(agent=self.name, status="completed", duration_ms=duration_ms)
+                AgentTrace(
+                    agent=self.name,
+                    status="completed",
+                    detail=_summarize(self.name, state),
+                    duration_ms=duration_ms,
+                )
             )

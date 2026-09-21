@@ -1,0 +1,81 @@
+{
+  "_meta": {
+    "note": "Trimmed from a real pipeline run (not fabricated). Replace with a fresher capture any time.",
+    "captured": "2026-09-18",
+    "papers_retrieved": 15,
+    "claims_checked": 42
+  },
+  "question": "Does creatine supplementation improve cognitive performance?",
+  "consensus": {
+    "evidence_strength": 0.841,
+    "controversy_score": 0.0,
+    "supports": 33,
+    "refutes": 0,
+    "not_enough_info": 9
+  },
+  "claims": [
+    {
+      "text": "Creatine and cyclocreatine increased brain concentrations of PCr and PCCr, respectively, and creatine protected against depletions of PCr and ATP produced by 3-NP.",
+      "label": "NOT_ENOUGH_INFO",
+      "confidence": 0.89,
+      "source_title": "Neuroprotective Effects of Creatine and Cyclocreatine in Animal Models of Huntington’s Disease",
+      "source_year": 1998
+    },
+    {
+      "text": "Creatine supplementation influences brain functioning as indicated by imaging studies and the measurement of oxygenated Hb.",
+      "label": "SUPPORTS",
+      "confidence": 0.97,
+      "source_title": "The influence of creatine supplementation on the cognitive functioning of vegetarians and omnivores",
+      "source_year": 2010
+    },
+    {
+      "text": "Given the key role played by creatine in the provision of energy, the influence of its supplementation on cognitive functioning was examined, contrasting the effect in omnivores and vegetarians.",
+      "label": "SUPPORTS",
+      "confidence": 0.94,
+      "source_title": "The influence of creatine supplementation on the cognitive functioning of vegetarians and omnivores",
+      "source_year": 2010
+    }
+  ],
+  "sources": [
+    {
+      "title": "Creatine supplementation with specific view to exercise/sports performance: an update",
+      "year": 2012,
+      "venue": "Journal of the International Society of Sports Nutrition",
+      "url": "https://doi.org/10.1186/1550-2783-9-33",
+      "citations": 305,
+      "score": 0.79
+    },
+    {
+      "title": "Dietary Supplements for Health, Adaptation, and Recovery in Athletes",
+      "year": 2018,
+      "venue": "International Journal of Sport Nutrition and Exercise Metabolism",
+      "url": "https://doi.org/10.1123/ijsnem.2017-0340",
+      "citations": 202,
+      "score": 0.79
+    },
+    {
+      "title": "Creatine metabolism and psychiatric disorders: Does creatine supplementation have therapeutic value?",
+      "year": 2012,
+      "venue": "Neuroscience & Biobehavioral Reviews",
+      "url": "https://doi.org/10.1016/j.neubiorev.2012.03.005",
+      "citations": 188,
+      "score": 0.78
+    },
+    {
+      "title": "Creatine Supplementation Associated or Not with Strength Training upon Emotional and Cognitive Measures in Older Women: A Randomized Double-Blind Study",
+      "year": 2013,
+      "venue": "PLoS ONE",
+      "url": "https://doi.org/10.1371/journal.pone.0076301",
+      "citations": 108,
+      "score": 0.77
+    },
+    {
+      "title": "Neuroprotective Effects of Creatine and Cyclocreatine in Animal Models of Huntington’s Disease",
+      "year": 1998,
+      "venue": "Journal of Neuroscience",
+      "url": "https://doi.org/10.1523/jneurosci.18-01-00156.1998",
+      "citations": 434,
+      "score": 0.76
+    }
+  ]
+}

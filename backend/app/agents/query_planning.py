@@ -9,11 +9,14 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import re
 
 from app.models.schemas import SubQuestion
 from app.orchestrator.state import ResearchState
 from app.services.llm_client import complete, llm_enabled
+
+logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = (
     "You split a research question into 2-5 focused, independently-searchable "
@@ -48,6 +51,9 @@ async def _llm_split(question: str, max_sub_questions: int) -> list[SubQuestion]
 
 def run(state: ResearchState) -> None:
     if llm_enabled():
-        state.sub_questions = asyncio.run(_llm_split(state.question, state.max_sub_questions))
-    else:
-        state.sub_questions = _fallback_split(state.question, state.max_sub_questions)
+        try:
+            state.sub_questions = asyncio.run(_llm_split(state.question, state.max_sub_questions))
+            return
+        except Exception as exc:  # noqa: BLE001 - LLM is phrasing help only; never fail the query over it
+            logger.warning("query_planning: LLM split failed (%r); using rule-based split", exc)
+    state.sub_questions = _fallback_split(state.question, state.max_sub_questions)

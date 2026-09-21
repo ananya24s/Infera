@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import re
 import uuid
 
@@ -15,10 +16,16 @@ from app.models.schemas import Claim, Paper
 from app.orchestrator.state import ResearchState
 from app.services.llm_client import complete, llm_enabled
 
+logger = logging.getLogger(__name__)
+
+# A local 7B model handles ~2-3 requests at once without thrashing.
+_LLM_CONCURRENCY = 3
+
 SYSTEM_PROMPT = (
     "You extract atomic, checkable factual claims from a scientific abstract. "
     "Each claim must be a single self-contained statement (no pronouns needing "
-    "outside context, no compound 'X and Y' claims). Respond ONLY with a JSON "
+    "outside context, no compound 'X and Y' claims). Use ONLY information stated "
+    "in the abstract — never add outside knowledge. Respond ONLY with a JSON "
     "array of strings, each the exact or lightly-cleaned claim text, max 6 items."
 )
 
@@ -37,14 +44,7 @@ async def _llm_extract(abstract: str, max_claims: int) -> list[str]:
     return cleaned[:max_claims] or _sentence_fallback(abstract, max_claims)
 
 
-def _extract_for_paper(paper: Paper, sub_question_id: str | None, max_claims: int) -> list[Claim]:
-    if not paper.abstract:
-        return []
-    if llm_enabled():
-        texts = asyncio.run(_llm_extract(paper.abstract, max_claims))
-    else:
-        texts = _sentence_fallback(paper.abstract, max_claims)
-
+def _to_claims(texts: list[str], paper: Paper, sub_question_id: str | None) -> list[Claim]:
     return [
         Claim(
             id=f"c_{uuid.uuid4().hex[:8]}",
@@ -57,14 +57,37 @@ def _extract_for_paper(paper: Paper, sub_question_id: str | None, max_claims: in
     ]
 
 
+async def _llm_extract_all(papers: list[Paper], max_claims: int) -> list[list[str] | None]:
+    """One LLM call per paper, a few at a time. A failed call yields None so the
+    caller can fall back to plain sentence splitting for just that paper."""
+    sem = asyncio.Semaphore(_LLM_CONCURRENCY)
+
+    async def one(paper: Paper) -> list[str] | None:
+        async with sem:
+            try:
+                return await _llm_extract(paper.abstract, max_claims)
+            except Exception as exc:  # noqa: BLE001 - LLM is phrasing help only
+                logger.warning("claim_extraction: LLM failed for %s (%r); using sentence split", paper.paper_id, exc)
+                return None
+
+    return await asyncio.gather(*(one(p) for p in papers))
+
+
 def run(state: ResearchState) -> None:
     settings = get_settings()
     top_papers = sorted(state.papers, key=lambda p: -p.final_score)[: max(8, len(state.papers) // 2)]
+    top_papers = [p for p in top_papers if p.abstract]
+
+    llm_results: list[list[str] | None] = [None] * len(top_papers)
+    if top_papers and llm_enabled():
+        llm_results = asyncio.run(_llm_extract_all(top_papers, settings.max_claims_per_paper))
 
     claims: list[Claim] = []
-    for paper in top_papers:
+    for paper, texts in zip(top_papers, llm_results):
+        if texts is None:
+            texts = _sentence_fallback(paper.abstract, settings.max_claims_per_paper)
         sub_question_id = _best_matching_sub_question(paper, state.sub_questions)
-        claims.extend(_extract_for_paper(paper, sub_question_id, settings.max_claims_per_paper))
+        claims.extend(_to_claims(texts, paper, sub_question_id))
 
     state.claims = claims
 

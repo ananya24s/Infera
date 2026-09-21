@@ -113,6 +113,8 @@ class ResearchReport(BaseModel):
     body_markdown: str
     revised: bool = False
     revision_notes: list[str] = Field(default_factory=list)
+    # "template" (no LLM) or e.g. "ollama/qwen2.5:7b" (LLM-drafted and self-checked)
+    generated_by: str = "template"
 
 
 class ResearchResponse(BaseModel):

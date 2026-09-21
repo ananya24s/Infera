@@ -80,6 +80,8 @@ export interface ResearchReport {
   body_markdown: string;
   revised: boolean;
   revision_notes: string[];
+  /** "template" (no LLM) or e.g. "ollama/qwen2.5:7b" */
+  generated_by: string;
 }
 
 export interface AgentTrace {
@@ -106,4 +108,9 @@ export interface ResearchRequest {
   question: string;
   max_papers?: number;
   max_sub_questions?: number;
+}
+
+export interface Health {
+  status: string;
+  llm: string;
 }
