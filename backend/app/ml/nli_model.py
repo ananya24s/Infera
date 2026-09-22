@@ -9,7 +9,7 @@ verification against scientific abstracts.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache
 
 from app.config import get_settings
@@ -20,6 +20,12 @@ from app.models.schemas import VerificationLabel
 class NLIResult:
     label: VerificationLabel
     confidence: float
+    # Probability of each label — needed to pick the *least neutral* evidence
+    # sentence in an abstract, not just the argmax label.
+    probs: dict[VerificationLabel, float] = field(default_factory=dict)
+
+    def prob(self, label: VerificationLabel) -> float:
+        return self.probs.get(label, 0.0)
 
 
 @lru_cache
@@ -45,17 +51,29 @@ _LABEL_MAP = {
 }
 
 
-def verify(premise: str, hypothesis: str) -> NLIResult:
-    """premise = source evidence sentence(s); hypothesis = extracted claim."""
-    clf = _pipeline()
-    # Most NLI checkpoints expect "premise </s></s> hypothesis" style pairing;
-    # the HF pipeline handles this via text_pair.
-    # only_first truncates the premise (evidence), never the claim being checked.
-    outputs = clf({"text": premise, "text_pair": hypothesis}, truncation="only_first", max_length=512)
-    if outputs and isinstance(outputs[0], list):
-        outputs = outputs[0]
+_BATCH_SIZE = 16
 
-    best = max(outputs, key=lambda o: o["score"])
-    raw_label = best["label"].lower()
-    label = _LABEL_MAP.get(raw_label, VerificationLabel.NOT_ENOUGH_INFO)
-    return NLIResult(label=label, confidence=float(best["score"]))
+
+def _to_result(outputs: list[dict]) -> NLIResult:
+    probs = {v: 0.0 for v in VerificationLabel}
+    for o in outputs:
+        label = _LABEL_MAP.get(o["label"].lower(), VerificationLabel.NOT_ENOUGH_INFO)
+        probs[label] += float(o["score"])
+    best = max(probs, key=probs.get)
+    return NLIResult(label=best, confidence=probs[best], probs=probs)
+
+
+def verify_batch(pairs: list[tuple[str, str]]) -> list[NLIResult]:
+    """pairs = [(premise, hypothesis), ...]. premise is the evidence; it's the
+    side that gets truncated if too long, never the hypothesis."""
+    if not pairs:
+        return []
+    clf = _pipeline()
+    inputs = [{"text": premise, "text_pair": hypothesis} for premise, hypothesis in pairs]
+    raw = clf(inputs, batch_size=_BATCH_SIZE, truncation="only_first", max_length=512)
+    return [_to_result(o if isinstance(o, list) else [o]) for o in raw]
+
+
+def verify(premise: str, hypothesis: str) -> NLIResult:
+    """Single-pair convenience wrapper. premise = evidence; hypothesis = the claim being checked."""
+    return verify_batch([(premise, hypothesis)])[0]

@@ -55,6 +55,7 @@ def run(state: ResearchState) -> None:
             existing = seen_titles.get(key)
             if existing is None or hybrid > existing.relevance_score:
                 paper.relevance_score = hybrid
+                paper.sub_question_id = sub_q.id
                 seen_titles[key] = paper
 
     state.papers = sorted(seen_titles.values(), key=lambda p: -p.relevance_score)[: state.max_papers]

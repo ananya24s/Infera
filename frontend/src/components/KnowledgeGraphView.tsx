@@ -45,6 +45,23 @@ export default function KnowledgeGraphView({ graph }: { graph: KnowledgeGraph })
           },
         },
         {
+          selector: 'node[type = "hypothesis"]',
+          style: {
+            "background-color": "#39d98a",
+            shape: "diamond",
+            label: "data(label)",
+            "font-size": 9,
+            "font-weight": 700,
+            width: 34,
+            height: 34,
+            color: "#e6f5ec",
+            "text-wrap": "wrap",
+            "text-max-width": "120px",
+            "text-valign": "bottom",
+            "text-margin-y": 6,
+          },
+        },
+        {
           selector: 'node[type = "claim"]',
           style: {
             "background-color": "#f08c00",
@@ -90,6 +107,7 @@ export default function KnowledgeGraphView({ graph }: { graph: KnowledgeGraph })
       <div className="kg-legend">
         <span><i className="dot paper" /> paper</span>
         <span><i className="dot claim" /> claim</span>
+        <span><i className="dot hypothesis" /> hypothesis</span>
         <span><i className="line supports" /> supports</span>
         <span><i className="line contradicts" /> contradicts</span>
         <span><i className="line cites" /> cites</span>

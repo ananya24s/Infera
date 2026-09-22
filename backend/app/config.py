@@ -43,6 +43,10 @@ class Settings(BaseModel):
     ollama_base_url: str = os.getenv("INFERA_OLLAMA_URL") or "http://localhost:11434"
     ollama_model: str = os.getenv("INFERA_OLLAMA_MODEL") or "qwen2.5:7b"
     ollama_timeout_s: float = _env_float("INFERA_OLLAMA_TIMEOUT_S", 180.0)
+    # How long Ollama keeps the model in RAM after its last request. Kept short on
+    # purpose: a 7B model resident during CPU-bound NLI verification pushes a 16GB
+    # machine into swap, and verification (which doesn't use the LLM) slows ~10x+.
+    ollama_keep_alive: str = os.getenv("INFERA_OLLAMA_KEEP_ALIVE") or "20s"
 
     # Trained-model checkpoints
     nli_model_name: str = os.getenv(

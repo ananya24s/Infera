@@ -19,6 +19,7 @@ from app.models.schemas import (
     ConsensusScore,
     KnowledgeGraph,
     Paper,
+    PaperStance,
     ResearchReport,
     StanceCluster,
     SubQuestion,
@@ -36,6 +37,7 @@ class ResearchState:
     papers: list[Paper] = field(default_factory=list)
     claims: list[Claim] = field(default_factory=list)
     verdicts: list[Verdict] = field(default_factory=list)
+    paper_stances: list[PaperStance] = field(default_factory=list)
     clusters: list[StanceCluster] = field(default_factory=list)
     consensus: list[ConsensusScore] = field(default_factory=list)
     knowledge_graph: KnowledgeGraph = field(default_factory=KnowledgeGraph)
@@ -59,9 +61,13 @@ def _plural(n: int, word: str) -> str:
 
 def _verification_summary(s: "ResearchState") -> str:
     counts = {"SUPPORTS": 0, "REFUTES": 0, "NOT_ENOUGH_INFO": 0}
-    for v in s.verdicts:
-        counts[v.label.value] += 1
-    return f"{counts['SUPPORTS']} supports / {counts['REFUTES']} refutes / {counts['NOT_ENOUGH_INFO']} nei"
+    for st in s.paper_stances:
+        counts[st.label.value] += 1
+    return f"{len(s.paper_stances)} papers: {counts['SUPPORTS']} support / {counts['REFUTES']} refute / {counts['NOT_ENOUGH_INFO']} neutral"
+
+
+def _consensus_summary(s: "ResearchState") -> str:
+    return ", ".join(f"{c.verdict} (controversy {c.controversy_score:.2f})" for c in s.consensus) or "no stances"
 
 
 # Short human-readable result of each stage, shown in the live progress view.
@@ -72,10 +78,11 @@ _SUMMARIES = {
     "claim_extraction": lambda s: _plural(len(s.claims), "claim"),
     "verification": _verification_summary,
     "stance_clustering": lambda s: _plural(len(s.clusters), "cluster"),
-    "consensus_scoring": lambda s: _plural(len(s.consensus), "sub-question") + " scored",
+    "consensus_scoring": _consensus_summary,
     "kg_builder": lambda s: f"{len(s.knowledge_graph.nodes)} nodes, {len(s.knowledge_graph.edges)} edges",
     "report_generation": lambda s: (
-        f"{s.report.generated_by}" + (f", {len(s.report.revision_notes)} revision(s)" if s.report.revised else "")
+        s.report.generated_by
+        + (f", {s.report.checked_sentences} citations checked, {s.report.flagged_sentences} flagged" if s.report.checked_sentences else "")
         if s.report else ""
     ),
 }

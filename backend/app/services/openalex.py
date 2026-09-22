@@ -10,6 +10,8 @@ into OpenAlex's faster "polite pool"; it's optional.
 """
 from __future__ import annotations
 
+import asyncio
+
 import httpx
 
 from app.config import get_settings
@@ -23,6 +25,9 @@ SELECT_FIELDS = (
 )
 
 _MAX_REFERENCES_PER_PAPER = 50
+
+_MAX_RETRIES = 3
+_BASE_BACKOFF_S = 1.5
 
 
 def _short_id(openalex_url: str) -> str:
@@ -59,9 +64,7 @@ async def search(query: str, limit: int = 20) -> list[Paper]:
         params["mailto"] = settings.openalex_contact_email
 
     async with httpx.AsyncClient(timeout=settings.request_timeout_s, follow_redirects=True) as client:
-        resp = await client.get(BASE_URL, params=params)
-        resp.raise_for_status()
-        data = resp.json()
+        data = await _get_with_retry(client, params)
 
     papers: list[Paper] = []
     for item in data.get("results", []):
@@ -98,3 +101,17 @@ async def search(query: str, limit: int = 20) -> list[Paper]:
             )
         )
     return papers
+
+
+async def _get_with_retry(client: httpx.AsyncClient, params: dict) -> dict:
+    for attempt in range(_MAX_RETRIES):
+        resp = await client.get(BASE_URL, params=params)
+        if resp.status_code != 429:
+            resp.raise_for_status()
+            return resp.json()
+        if attempt < _MAX_RETRIES - 1:
+            retry_after = resp.headers.get("retry-after")
+            delay = float(retry_after) if retry_after else _BASE_BACKOFF_S * (2**attempt)
+            await asyncio.sleep(delay)
+    resp.raise_for_status()  # exhausted retries; surface the 429 as an error
+    return resp.json()

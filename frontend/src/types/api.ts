@@ -15,11 +15,14 @@ export interface Paper {
   relevance_score: number;
   credibility_score: number;
   final_score: number;
+  sub_question_id: string | null;
 }
 
 export interface SubQuestion {
   id: string;
   text: string;
+  /** The sub-question as a declarative statement; sources are verified against this. */
+  hypothesis: string;
   rationale: string;
 }
 
@@ -31,10 +34,23 @@ export interface Claim {
   source_sentence: string;
 }
 
-export interface Verdict {
-  claim_id: string;
+/** A source's position on a hypothesis, judged from its most decisive abstract sentence. */
+export interface PaperStance {
+  paper_id: string;
+  sub_question_id: string;
   label: VerificationLabel;
   confidence: number;
+  evidence_sentence: string;
+}
+
+export interface Verdict {
+  claim_id: string;
+  /** Stance: does this finding support/refute the hypothesis? */
+  label: VerificationLabel;
+  confidence: number;
+  /** Fidelity: does the claim's own source abstract actually support it? */
+  fidelity: VerificationLabel;
+  fidelity_confidence: number;
   evidence_sentence: string;
 }
 
@@ -46,10 +62,15 @@ export interface StanceCluster {
   agreement_ratio: number;
 }
 
+export type ConsensusVerdict = "supported" | "refuted" | "mixed" | "insufficient";
+
 export interface ConsensusScore {
   sub_question_id: string;
   evidence_strength: number;
   controversy_score: number;
+  /** -1 (all decisive papers refute) to +1 (all support) */
+  net_support: number;
+  verdict: ConsensusVerdict;
   supports: number;
   refutes: number;
   not_enough_info: number;
@@ -57,7 +78,7 @@ export interface ConsensusScore {
 
 export interface KGNode {
   id: string;
-  type: "paper" | "claim";
+  type: "paper" | "claim" | "hypothesis";
   label: string;
   data: Record<string, unknown>;
 }
@@ -82,6 +103,9 @@ export interface ResearchReport {
   revision_notes: string[];
   /** "template" (no LLM) or e.g. "ollama/qwen2.5:7b" */
   generated_by: string;
+  /** cited sentences re-verified against the source they cite, and how many failed */
+  checked_sentences: number;
+  flagged_sentences: number;
 }
 
 export interface AgentTrace {
@@ -97,6 +121,7 @@ export interface ResearchResponse {
   papers: Paper[];
   claims: Claim[];
   verdicts: Verdict[];
+  paper_stances: PaperStance[];
   clusters: StanceCluster[];
   consensus: ConsensusScore[];
   knowledge_graph: KnowledgeGraph;

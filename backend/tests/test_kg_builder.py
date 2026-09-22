@@ -35,3 +35,22 @@ def test_arxiv_papers_have_no_references_so_no_cites_edges():
     run(state)
 
     assert [e for e in state.knowledge_graph.edges if e.type == "cites"] == []
+
+
+def test_hypothesis_hub_links_papers_by_their_stance():
+    from app.models.schemas import PaperStance, SubQuestion, VerificationLabel as L
+
+    state = ResearchState(question="q")
+    state.sub_questions = [SubQuestion(id="sq1", text="q?", hypothesis="X improves Y.")]
+    state.papers = [_paper("a"), _paper("b"), _paper("c")]
+    state.paper_stances = [
+        PaperStance(paper_id="a", sub_question_id="sq1", label=L.SUPPORTS, confidence=0.9),
+        PaperStance(paper_id="b", sub_question_id="sq1", label=L.REFUTES, confidence=0.9),
+        PaperStance(paper_id="c", sub_question_id="sq1", label=L.NOT_ENOUGH_INFO, confidence=0.9),
+    ]
+    run(state)
+
+    hubs = [n for n in state.knowledge_graph.nodes if n.type == "hypothesis"]
+    assert [h.label for h in hubs] == ["X improves Y."]
+    stance_edges = {(e.source, e.type) for e in state.knowledge_graph.edges if e.target == "hyp_sq1"}
+    assert stance_edges == {("a", "supports"), ("b", "contradicts")}  # neutral paper gets no edge

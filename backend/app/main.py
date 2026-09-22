@@ -72,6 +72,7 @@ def _build_response(state: ResearchState) -> ResearchResponse:
         papers=state.papers,
         claims=state.claims,
         verdicts=state.verdicts,
+        paper_stances=state.paper_stances,
         clusters=state.clusters,
         consensus=state.consensus,
         knowledge_graph=state.knowledge_graph,

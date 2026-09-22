@@ -6,18 +6,16 @@ const LABEL_CLASS: Record<string, string> = {
   NOT_ENOUGH_INFO: "nei",
 };
 
-export default function ClaimsPanel({
-  claims,
-  verdicts,
-}: {
-  claims: Claim[];
-  verdicts: Verdict[];
-}) {
+export default function ClaimsPanel({ claims, verdicts }: { claims: Claim[]; verdicts: Verdict[] }) {
   const verdictByClaim = new Map(verdicts.map((v) => [v.claim_id, v]));
 
   return (
     <div className="panel claims-panel">
       <h2>Claims ({claims.length})</h2>
+      <p className="panel-note">
+        Each claim gets two independent checks: its <b>stance</b> on the hypothesis, and its <b>source
+        check</b> (does its own abstract actually back it up).
+      </p>
       <div className="claims-list">
         {claims.map((c) => {
           const v = verdictByClaim.get(c.id);
@@ -25,8 +23,13 @@ export default function ClaimsPanel({
             <div key={c.id} className="claim-card">
               <div className="claim-text">{c.text}</div>
               {v && (
-                <div className={`badge ${LABEL_CLASS[v.label]}`}>
-                  {v.label} ({(v.confidence * 100).toFixed(0)}%)
+                <div className="claim-badges">
+                  <span className={`badge ${LABEL_CLASS[v.label]}`} title="Stance toward the hypothesis">
+                    stance: {v.label.replace(/_/g, " ").toLowerCase()} ({Math.round(v.confidence * 100)}%)
+                  </span>
+                  <span className={`badge ${LABEL_CLASS[v.fidelity]}`} title="Is the claim supported by its own source abstract?">
+                    source check: {v.fidelity === "SUPPORTS" ? "verified" : v.fidelity === "REFUTES" ? "contradicted" : "unverified"}
+                  </span>
                 </div>
               )}
             </div>

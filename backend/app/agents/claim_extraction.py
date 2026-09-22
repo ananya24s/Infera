@@ -25,8 +25,9 @@ SYSTEM_PROMPT = (
     "You extract atomic, checkable factual claims from a scientific abstract. "
     "Each claim must be a single self-contained statement (no pronouns needing "
     "outside context, no compound 'X and Y' claims). Use ONLY information stated "
-    "in the abstract — never add outside knowledge. Respond ONLY with a JSON "
-    "array of strings, each the exact or lightly-cleaned claim text, max 6 items."
+    "in the abstract — never add outside knowledge. Prefer findings that bear on "
+    "the research question you are given. Respond ONLY with a JSON array of "
+    "strings, each the exact or lightly-cleaned claim text, max 6 items."
 )
 
 
@@ -36,8 +37,10 @@ def _sentence_fallback(abstract: str, max_claims: int) -> list[str]:
     return sentences[:max_claims]
 
 
-async def _llm_extract(abstract: str, max_claims: int) -> list[str]:
-    raw = await complete(SYSTEM_PROMPT, f"Abstract:\n{abstract}", max_tokens=500)
+async def _llm_extract(abstract: str, max_claims: int, question: str) -> list[str]:
+    raw = await complete(
+        SYSTEM_PROMPT, f"Research question: {question}\n\nAbstract:\n{abstract}", max_tokens=500
+    )
     match = re.search(r"\[.*\]", raw, re.DOTALL)
     items = json.loads(match.group(0) if match else raw)
     cleaned = [str(i).strip() for i in items if str(i).strip()]
@@ -57,7 +60,9 @@ def _to_claims(texts: list[str], paper: Paper, sub_question_id: str | None) -> l
     ]
 
 
-async def _llm_extract_all(papers: list[Paper], max_claims: int) -> list[list[str] | None]:
+async def _llm_extract_all(
+    papers: list[Paper], max_claims: int, question_for: dict[str | None, str]
+) -> list[list[str] | None]:
     """One LLM call per paper, a few at a time. A failed call yields None so the
     caller can fall back to plain sentence splitting for just that paper."""
     sem = asyncio.Semaphore(_LLM_CONCURRENCY)
@@ -65,7 +70,7 @@ async def _llm_extract_all(papers: list[Paper], max_claims: int) -> list[list[st
     async def one(paper: Paper) -> list[str] | None:
         async with sem:
             try:
-                return await _llm_extract(paper.abstract, max_claims)
+                return await _llm_extract(paper.abstract, max_claims, question_for.get(paper.sub_question_id, ""))
             except Exception as exc:  # noqa: BLE001 - LLM is phrasing help only
                 logger.warning("claim_extraction: LLM failed for %s (%r); using sentence split", paper.paper_id, exc)
                 return None
@@ -80,30 +85,14 @@ def run(state: ResearchState) -> None:
 
     llm_results: list[list[str] | None] = [None] * len(top_papers)
     if top_papers and llm_enabled():
-        llm_results = asyncio.run(_llm_extract_all(top_papers, settings.max_claims_per_paper))
+        question_for = {sq.id: sq.text for sq in state.sub_questions}
+        question_for[None] = state.question
+        llm_results = asyncio.run(_llm_extract_all(top_papers, settings.max_claims_per_paper, question_for))
 
     claims: list[Claim] = []
     for paper, texts in zip(top_papers, llm_results):
         if texts is None:
             texts = _sentence_fallback(paper.abstract, settings.max_claims_per_paper)
-        sub_question_id = _best_matching_sub_question(paper, state.sub_questions)
-        claims.extend(_to_claims(texts, paper, sub_question_id))
+        claims.extend(_to_claims(texts, paper, paper.sub_question_id))
 
     state.claims = claims
-
-
-def _best_matching_sub_question(paper: Paper, sub_questions) -> str | None:
-    if not sub_questions:
-        return None
-    paper_tokens = set(_tokens(f"{paper.title} {paper.abstract}"))
-    best_id, best_overlap = None, -1
-    for sq in sub_questions:
-        overlap = len(paper_tokens & set(_tokens(sq.text)))
-        if overlap > best_overlap:
-            best_overlap = overlap
-            best_id = sq.id
-    return best_id
-
-
-def _tokens(text: str) -> list[str]:
-    return [t for t in "".join(c.lower() if c.isalnum() else " " for c in text).split() if len(t) > 3]

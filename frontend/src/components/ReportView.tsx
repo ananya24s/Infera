@@ -60,7 +60,11 @@ export default function ReportView({ report }: { report: ResearchReport }) {
         <span className={`badge ${isTemplate ? "nei" : "supports"} badge-inline`}>
           {isTemplate ? "template · no LLM" : report.generated_by}
         </span>
-        {report.revised && <span className="badge revised">self-checked · {report.revision_notes.length} flagged</span>}
+        {report.checked_sentences > 0 && (
+          <span className={`badge ${report.flagged_sentences ? "revised" : "supports"}`}>
+            {report.checked_sentences} cited sentences checked · {report.flagged_sentences} flagged
+          </span>
+        )}
       </h2>
       <div
         className="report-body"

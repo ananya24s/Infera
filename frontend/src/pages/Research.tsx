@@ -102,7 +102,7 @@ export default function Research() {
             </>
           )}
           {tab === "graph" && <KnowledgeGraphView graph={result.knowledge_graph} />}
-          {tab === "sources" && <PapersPanel papers={result.papers} />}
+          {tab === "sources" && <PapersPanel papers={result.papers} stances={result.paper_stances} />}
           {tab === "claims" && <ClaimsPanel claims={result.claims} verdicts={result.verdicts} />}
         </>
       )}

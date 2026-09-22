@@ -15,6 +15,7 @@ Providers (INFERA_LLM_PROVIDER):
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 
@@ -102,6 +103,7 @@ async def _complete_ollama(system: str, prompt: str, max_tokens: int) -> str:
     payload = {
         "model": settings.ollama_model,
         "stream": False,
+        "keep_alive": settings.ollama_keep_alive,
         "messages": [
             {"role": "system", "content": system},
             {"role": "user", "content": prompt},
@@ -110,10 +112,25 @@ async def _complete_ollama(system: str, prompt: str, max_tokens: int) -> str:
         "options": {"num_predict": max_tokens, "temperature": 0.2},
     }
     # Generous timeout: a 7B model on a laptop can take a while for long outputs.
-    async with httpx.AsyncClient(timeout=settings.ollama_timeout_s) as client:
-        resp = await client.post(f"{settings.ollama_base_url}/api/chat", json=payload)
-        resp.raise_for_status()
-        return resp.json()["message"]["content"]
+    # Ollama answers 5xx when it can't (re)load the model — seen when the machine is
+    # briefly out of memory — and that clears on its own, so retry rather than
+    # silently downgrading the whole step to its non-LLM fallback.
+    last_exc: Exception | None = None
+    for attempt, delay in enumerate((0, 4, 12)):
+        if delay:
+            await asyncio.sleep(delay)
+        try:
+            async with httpx.AsyncClient(timeout=settings.ollama_timeout_s) as client:
+                resp = await client.post(f"{settings.ollama_base_url}/api/chat", json=payload)
+                resp.raise_for_status()
+                return resp.json()["message"]["content"]
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code < 500:
+                raise
+            last_exc = exc
+            logger.warning("ollama returned %s (attempt %d/3); retrying", exc.response.status_code, attempt + 1)
+    assert last_exc is not None
+    raise last_exc
 
 
 async def _complete_anthropic(system: str, prompt: str, max_tokens: int) -> str:

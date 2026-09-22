@@ -1,36 +1,57 @@
-from app.agents.consensus_scoring import run
-from app.models.schemas import Claim, Verdict, VerificationLabel
+from app.agents.consensus_scoring import run, score_stances
+from app.models.schemas import PaperStance, SubQuestion, VerificationLabel as L
 from app.orchestrator.state import ResearchState
 
 
-def _state_with(labels: list[VerificationLabel]) -> ResearchState:
-    state = ResearchState(question="does X cause Y?")
-    for i, label in enumerate(labels):
-        claim = Claim(id=f"c{i}", text=f"claim {i}", sub_question_id="sq1", source_paper_id=f"p{i}")
-        state.claims.append(claim)
-        state.verdicts.append(Verdict(claim_id=claim.id, label=label, confidence=0.9))
-    return state
+def _stances(labels: list[L], conf: float = 0.9) -> list[PaperStance]:
+    return [PaperStance(paper_id=f"p{i}", sub_question_id="sq1", label=l, confidence=conf) for i, l in enumerate(labels)]
 
 
-def test_unanimous_support_gives_low_controversy_high_strength():
-    state = _state_with([VerificationLabel.SUPPORTS] * 5)
-    run(state)
-    assert len(state.consensus) == 1
-    cs = state.consensus[0]
+def test_unanimous_support_is_supported_with_no_controversy():
+    cs = score_stances("sq1", _stances([L.SUPPORTS] * 6))
+    assert cs.verdict == "supported"
     assert cs.controversy_score == 0.0
+    assert cs.net_support == 1.0
     assert cs.evidence_strength > 0.8
 
 
-def test_even_split_gives_max_controversy():
-    state = _state_with([VerificationLabel.SUPPORTS, VerificationLabel.REFUTES])
-    run(state)
-    cs = state.consensus[0]
+def test_even_split_is_mixed_with_max_controversy_but_strong_evidence():
+    cs = score_stances("sq1", _stances([L.SUPPORTS] * 3 + [L.REFUTES] * 3))
+    assert cs.verdict == "mixed"
     assert cs.controversy_score == 1.0
+    assert cs.net_support == 0.0
+    # lots of decisive evidence that disagrees: strong evidence AND high controversy
+    assert cs.evidence_strength > 0.8
 
 
-def test_all_not_enough_info_gives_zero_controversy_and_strength():
-    state = _state_with([VerificationLabel.NOT_ENOUGH_INFO] * 3)
+def test_majority_refute_is_refuted():
+    cs = score_stances("sq1", _stances([L.REFUTES] * 7 + [L.SUPPORTS]))
+    assert cs.verdict == "refuted"
+    assert cs.net_support < 0
+
+
+def test_all_neutral_is_insufficient_with_zero_strength():
+    cs = score_stances("sq1", _stances([L.NOT_ENOUGH_INFO] * 4))
+    assert cs.verdict == "insufficient"
+    assert cs.evidence_strength == 0.0 and cs.controversy_score == 0.0
+
+
+def test_one_confident_paper_is_not_strong_evidence():
+    cs = score_stances("sq1", _stances([L.SUPPORTS] + [L.NOT_ENOUGH_INFO] * 4))
+    assert cs.verdict == "insufficient"  # a single paper can't establish a consensus
+    assert cs.evidence_strength < 0.25
+
+
+def test_neutral_papers_lower_evidence_strength_not_controversy():
+    few = score_stances("sq1", _stances([L.SUPPORTS] * 5 + [L.NOT_ENOUGH_INFO] * 15))
+    many = score_stances("sq1", _stances([L.SUPPORTS] * 5))
+    assert few.controversy_score == many.controversy_score == 0.0
+    assert few.evidence_strength < many.evidence_strength
+
+
+def test_run_scores_each_sub_question_from_paper_stances():
+    state = ResearchState(question="q")
+    state.sub_questions = [SubQuestion(id="sq1", text="a?"), SubQuestion(id="sq2", text="b?")]
+    state.paper_stances = _stances([L.SUPPORTS, L.SUPPORTS])
     run(state)
-    cs = state.consensus[0]
-    assert cs.controversy_score == 0.0
-    assert cs.evidence_strength == 0.0
+    assert [c.sub_question_id for c in state.consensus] == ["sq1"]  # sq2 has no stances
