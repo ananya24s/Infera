@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AgentTable from "../components/AgentTable";
+import HeroVisual from "../components/HeroVisual";
 import QueryForm from "../components/QueryForm";
 import SamplePreview from "../components/SamplePreview";
 import { useResearch } from "../context/ResearchContext";
@@ -37,29 +38,33 @@ export default function Home() {
   return (
     <div className="page home">
       <section className="home-hero">
-        <p className="eyebrow">// evidence checking for research questions</p>
-        <h1 className="home-headline">
-          Ask a research question.
-          <br />
-          Every claim gets <span className="hl">checked</span>.
-        </h1>
-        <p className="home-sub">
-          AI-written research summaries often cite sources that don&apos;t actually support the claim, and
-          nothing shows you how strong the evidence really is. Infera retrieves real papers, checks each
-          claim against its evidence with a trained model, and shows where sources agree and where they
-          don&apos;t.
-        </p>
+        <div className="home-hero-text">
+          <p className="eyebrow">// evidence checking for research questions</p>
+          <h1 className="home-headline">
+            Ask a research question.
+            <br />
+            Every claim gets <span className="hl">checked</span>.
+          </h1>
+          <p className="home-sub">
+            AI-written research summaries often cite sources that don&apos;t actually support the claim, and
+            nothing shows you how strong the evidence really is. Infera retrieves real papers, checks each
+            claim against its evidence with a trained model, and shows where sources agree and where they
+            don&apos;t.
+          </p>
 
-        <QueryForm onSubmit={submit} loading={status === "running"} value={value} onChange={setValue} />
+          <QueryForm onSubmit={submit} loading={status === "running"} value={value} onChange={setValue} />
 
-        <div className="term-history">
-          {EXAMPLE_QUESTIONS.map((q, i) => (
-            <button key={q} className="term-history-item" onClick={() => submit(q)}>
-              <span className="history-index">{482 + i}</span>
-              <span className="history-text">{q}</span>
-            </button>
-          ))}
+          <div className="term-history">
+            {EXAMPLE_QUESTIONS.map((q, i) => (
+              <button key={q} className="term-history-item" onClick={() => submit(q)}>
+                <span className="history-index">{482 + i}</span>
+                <span className="history-text">{q}</span>
+              </button>
+            ))}
+          </div>
         </div>
+
+        <HeroVisual />
       </section>
 
       <section className="home-section">

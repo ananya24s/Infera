@@ -1,4 +1,5 @@
 import { NavLink, Route, Routes, useLocation } from "react-router-dom";
+import Logo from "./components/Logo";
 import StatusBar from "./components/StatusBar";
 import About from "./pages/About";
 import Home from "./pages/Home";
@@ -28,6 +29,7 @@ export default function App() {
 
       <header className="site-header">
         <NavLink to="/" className="brand-link">
+          <Logo size={22} />
           <span className="brand-mark">
             infera<span className="brand-cursor" />
           </span>
