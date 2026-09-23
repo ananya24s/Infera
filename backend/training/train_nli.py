@@ -1,66 +1,44 @@
-"""Fine-tune an NLI checkpoint on SciFact (+ optionally FEVER) for scientific
+"""Fine-tune an NLI checkpoint on the real SciFact dataset for scientific
 claim verification.
 
 Usage:
-    python -m training.train_nli --output_dir ./data/scifact-nli --epochs 3
+    python -m training.train_nli --output_dir ./data/scifact-nli --epochs 4
 
-Loads the real `allenai/scifact` dataset from HuggingFace Datasets (claim +
-cited_doc_id + evidence label: SUPPORT/CONTRADICT/NOINFO), maps it onto the
-SUPPORTS/REFUTES/NOT_ENOUGH_INFO label set used throughout Infera, and
-fine-tunes a sequence-classification model (default: the same base as
-app/config.py's INFERA_NLI_MODEL). Point INFERA_NLI_MODEL at --output_dir
-once training completes to switch the live pipeline to the fine-tuned model.
+Uses training.scifact_data (the local SciFact release — see that module's
+docstring for how to fetch it) and fine-tunes a sequence-classification model
+on entailment/neutral/contradiction, keeping the label scheme the live
+pipeline already expects (app/ml/nli_model.py), so the output directory is a
+drop-in replacement: point INFERA_NLI_MODEL at it and nothing else changes.
 """
 from __future__ import annotations
 
 import argparse
 
-LABEL_MAP = {
-    "SUPPORT": "entailment",
-    "CONTRADICT": "contradiction",
-    "NOINFO": "neutral",
-}
+from training.scifact_data import Example, load_examples
+
 LABEL_LIST = ["entailment", "neutral", "contradiction"]
 
 
-def build_examples(split):
-    from datasets import load_dataset
+def _to_hf_dataset(examples: list[Example]):
+    from datasets import Dataset
 
-    scifact = load_dataset("allenai/scifact", "claims", split=split)
-    corpus = {row["doc_id"]: row for row in load_dataset("allenai/scifact", "corpus", split="train")}
-
-    examples = []
-    for row in scifact:
-        cited = row.get("cited_doc_ids") or []
-        evidence = row.get("evidence") or {}
-        if not cited:
-            continue
-        for doc_id in cited:
-            doc = corpus.get(doc_id)
-            if not doc:
-                continue
-            premise = " ".join(doc.get("abstract", []))
-            doc_evidence = evidence.get(str(doc_id)) or evidence.get(doc_id)
-            label = "NOINFO"
-            if doc_evidence:
-                label = doc_evidence[0].get("label", "NOINFO")
-            examples.append(
-                {"premise": premise, "hypothesis": row["claim"], "label": LABEL_MAP[label]}
-            )
-    return examples
+    return Dataset.from_list(
+        [{"premise": e.premise, "hypothesis": e.hypothesis, "label": e.label} for e in examples]
+    )
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base_model", default="MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli")
     parser.add_argument("--output_dir", default="./data/scifact-nli")
-    parser.add_argument("--epochs", type=int, default=3)
+    parser.add_argument("--epochs", type=int, default=4)
     parser.add_argument("--batch_size", type=int, default=8)
-    parser.add_argument("--lr", type=float, default=2e-5)
+    parser.add_argument("--lr", type=float, default=1e-5)
+    parser.add_argument("--max_length", type=int, default=256)
     args = parser.parse_args()
 
     import numpy as np
-    from datasets import Dataset
+    import torch
     from transformers import (
         AutoModelForSequenceClassification,
         AutoTokenizer,
@@ -68,39 +46,72 @@ def main() -> None:
         TrainingArguments,
     )
 
-    train_examples = build_examples("train")
-    val_examples = build_examples("validation")
+    train_examples = load_examples("train")
+    val_examples = load_examples("dev")
     print(f"train={len(train_examples)} val={len(val_examples)}")
 
     tokenizer = AutoTokenizer.from_pretrained(args.base_model)
     model = AutoModelForSequenceClassification.from_pretrained(
         args.base_model, num_labels=len(LABEL_LIST), ignore_mismatched_sizes=True
     )
+    # `ignore_mismatched_sizes` only reinitializes the classifier head when its
+    # shape differs from ours — since most 3-way NLI checkpoints already have 3
+    # labels, the shape matches and the *pretrained* head weights are kept as-is.
+    # Those weights are ordered however that checkpoint's config says (often NOT
+    # entailment/neutral/contradiction — cross-encoder/nli-deberta-v3-xsmall is
+    # contradiction/entailment/neutral). Silently relabeling them to our order
+    # scrambles a working head into a broken one (reproduced: 1-epoch accuracy
+    # dropped to 0.31, near-random, until this fix). Force a fresh head instead
+    # so it's trained from scratch on SciFact with our label order — the encoder
+    # underneath still keeps all its pretrained NLI/FEVER/ANLI knowledge.
+    for name, module in model.named_modules():
+        if name.endswith("classifier") and isinstance(module, torch.nn.Linear):
+            module.reset_parameters()
     model.config.id2label = dict(enumerate(LABEL_LIST))
-    model.config.label2id = {l: i for i, l in enumerate(LABEL_LIST)}
+    model.config.label2id = {label: i for i, label in enumerate(LABEL_LIST)}
 
     def tokenize(batch):
-        enc = tokenizer(batch["premise"], batch["hypothesis"], truncation=True, max_length=256)
+        enc = tokenizer(
+            batch["premise"], batch["hypothesis"], truncation="only_first", max_length=args.max_length
+        )
         enc["labels"] = [LABEL_LIST.index(l) for l in batch["label"]]
         return enc
 
-    train_ds = Dataset.from_list(train_examples).map(tokenize, batched=True)
-    val_ds = Dataset.from_list(val_examples).map(tokenize, batched=True)
+    remove_cols = ["premise", "hypothesis", "label"]
+    train_ds = _to_hf_dataset(train_examples).map(tokenize, batched=True, remove_columns=remove_cols)
+    val_ds = _to_hf_dataset(val_examples).map(tokenize, batched=True, remove_columns=remove_cols)
+
+    steps_per_epoch = -(-len(train_examples) // args.batch_size)  # ceil
+    total_steps = steps_per_epoch * args.epochs
+    warmup_steps = max(10, int(0.1 * total_steps))
 
     def compute_metrics(eval_pred):
+        from sklearn.metrics import f1_score
+
         preds = np.argmax(eval_pred.predictions, axis=1)
         acc = (preds == eval_pred.label_ids).mean()
-        return {"accuracy": float(acc)}
+        macro_f1 = f1_score(eval_pred.label_ids, preds, average="macro")
+        return {"accuracy": float(acc), "macro_f1": float(macro_f1)}
 
     training_args = TrainingArguments(
         output_dir=args.output_dir,
+        # DeBERTa-v3's disentangled attention produces NaN gradients on Apple's
+        # MPS backend (reproduced: loss collapses to 0/nan within the first
+        # epoch) — force CPU, which is slower but numerically correct.
+        use_cpu=True,
         num_train_epochs=args.epochs,
         per_device_train_batch_size=args.batch_size,
         per_device_eval_batch_size=args.batch_size,
         learning_rate=args.lr,
+        warmup_steps=warmup_steps,
+        weight_decay=0.01,
         eval_strategy="epoch",
         save_strategy="epoch",
+        save_total_limit=2,
         load_best_model_at_end=True,
+        metric_for_best_model="macro_f1",
+        logging_steps=20,
+        report_to=[],
     )
 
     trainer = Trainer(
@@ -108,13 +119,16 @@ def main() -> None:
         args=training_args,
         train_dataset=train_ds,
         eval_dataset=val_ds,
-        tokenizer=tokenizer,
+        processing_class=tokenizer,
         compute_metrics=compute_metrics,
     )
     trainer.train()
+    metrics = trainer.evaluate()
+    print("Final eval:", metrics)
+
     trainer.save_model(args.output_dir)
     tokenizer.save_pretrained(args.output_dir)
-    print(f"Saved fine-tuned checkpoint to {args.output_dir}")
+    print(f"\nSaved fine-tuned checkpoint to {args.output_dir}")
     print(f"Set INFERA_NLI_MODEL={args.output_dir} to use it.")
 
 

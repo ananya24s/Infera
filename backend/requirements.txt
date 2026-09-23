@@ -10,6 +10,7 @@ faiss-cpu>=1.9
 rank-bm25>=0.2.2
 transformers>=4.45
 torch>=2.4
+accelerate>=1.1.0
 lightgbm>=4.5
 hdbscan>=0.8.38
 scikit-learn>=1.5
