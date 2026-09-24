@@ -1,4 +1,11 @@
-import type { AgentTrace, Health, ResearchRequest, ResearchResponse } from "../types/api";
+import type {
+  AgentTrace,
+  Health,
+  ResearchRequest,
+  ResearchResponse,
+  SingleSourceRequest,
+  SingleSourceResult,
+} from "../types/api";
 
 export const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8001";
 
@@ -73,5 +80,20 @@ export async function streamResearch(
 export async function fetchHealth(): Promise<Health> {
   const res = await fetch(`${API_BASE}/health`);
   if (!res.ok) throw new Error(`health ${res.status}`);
+  return res.json();
+}
+
+export async function verifySource(req: SingleSourceRequest): Promise<SingleSourceResult> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}/api/verify-source`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req),
+    });
+  } catch {
+    throw new Error(`Can't reach the backend at ${API_BASE}. Is it running? (uvicorn app.main:app --port 8001)`);
+  }
+  if (!res.ok) throw new Error(await describeHttpError(res));
   return res.json();
 }

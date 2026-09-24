@@ -19,7 +19,7 @@ import numpy as np
 
 from app.agents.query_planning import question_to_hypothesis
 from app.ml.nli_model import NLIResult, verify_batch
-from app.models.schemas import PaperStance, Verdict, VerificationLabel
+from app.models.schemas import PaperStance, SingleSourceResult, Verdict, VerificationLabel
 from app.orchestrator.state import ResearchState
 from app.services.text import split_sentences
 
@@ -143,6 +143,32 @@ def _claim_verdicts(state: ResearchState, hyp: dict[str | None, str]) -> list[Ve
             )
         )
     return verdicts
+
+
+def verify_single_source(source_text: str, hypothesis: str) -> SingleSourceResult:
+    """Ad-hoc version of _paper_stances for one pasted source outside the full
+    pipeline — same per-sentence + whole-text NLI check, relevance gate, and
+    thresholds, just scoped to one (source, hypothesis) pair instead of a
+    batch of retrieved papers."""
+    sentences = split_sentences(source_text)
+    candidates = sentences + [source_text] if source_text.strip() else []
+    if not candidates:
+        return SingleSourceResult(hypothesis=hypothesis, label=NEI, confidence=1.0, evidence_sentence="")
+
+    results = verify_batch([(c, hypothesis) for c in candidates])
+    relevance = _relevance(candidates, [hypothesis] * len(candidates))
+
+    best_prob, best_label, best_text = -1.0, NEI, ""
+    for c, r, rel in zip(candidates, results, relevance):
+        label, prob = _decisiveness(r)
+        if rel < MIN_RELEVANCE:
+            prob = 0.0
+        if prob > best_prob:
+            best_prob, best_label, best_text = prob, label, c
+
+    if best_prob >= STANCE_MIN_PROB:
+        return SingleSourceResult(hypothesis=hypothesis, label=best_label, confidence=best_prob, evidence_sentence=best_text)
+    return SingleSourceResult(hypothesis=hypothesis, label=NEI, confidence=1.0 - best_prob, evidence_sentence="")
 
 
 def run(state: ResearchState) -> None:

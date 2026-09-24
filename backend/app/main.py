@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
 from app.config import get_settings
-from app.models.schemas import ResearchRequest, ResearchResponse
+from app.models.schemas import ResearchRequest, ResearchResponse, SingleSourceRequest, SingleSourceResult
 from app.orchestrator.orchestrator import build_default_pipeline
 from app.orchestrator.state import ResearchState
 from app.rate_limit import enforce_rate_limit
@@ -104,6 +104,29 @@ async def research(req: ResearchRequest) -> ResearchResponse:
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     return _build_response(state)
+
+
+@app.post(
+    "/api/verify-source",
+    response_model=SingleSourceResult,
+    dependencies=[Depends(enforce_rate_limit)],
+)
+async def verify_source(req: SingleSourceRequest) -> SingleSourceResult:
+    """Check one pasted source (e.g. an abstract) against a hypothesis, without
+    running retrieval or the rest of the pipeline — same NLI stance check the
+    pipeline runs per-paper, just for a single ad-hoc source."""
+    from app.agents.query_planning import question_to_hypothesis
+    from app.agents.verification import verify_single_source
+
+    if not req.source_text.strip():
+        raise HTTPException(status_code=422, detail="source_text must not be empty")
+    hypothesis = req.hypothesis.strip() or question_to_hypothesis(req.question)
+    if not hypothesis:
+        raise HTTPException(status_code=422, detail="either hypothesis or question must be provided")
+    try:
+        return await asyncio.to_thread(verify_single_source, req.source_text, hypothesis)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 def _sse(event: str, data: dict) -> str:

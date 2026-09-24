@@ -993,3 +993,94 @@
 @media (prefers-reduced-motion: reduce) {
   .hv-ring, .hv-edge, .hv-node, .hv-hyp-diamond { animation: none; opacity: 1; stroke-dashoffset: 0; }
 }
+
+/* Single-source verification form */
+.verify-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 640px;
+}
+
+.verify-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text);
+  opacity: 0.7;
+  margin-top: 10px;
+}
+
+.verify-label:first-child {
+  margin-top: 0;
+}
+
+.verify-form input,
+.verify-form textarea {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background: var(--code-bg);
+  color: var(--text-h);
+  font: inherit;
+  font-size: 13.5px;
+  outline: none;
+  resize: vertical;
+  transition: border-color 0.15s ease;
+}
+
+.verify-form input:focus,
+.verify-form textarea:focus {
+  border-color: var(--accent);
+}
+
+.verify-form input::placeholder,
+.verify-form textarea::placeholder {
+  color: var(--text);
+  opacity: 0.45;
+}
+
+.verify-form button {
+  align-self: flex-start;
+  margin-top: 14px;
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.verify-form button:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-bg);
+}
+
+.verify-form button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.verify-result {
+  max-width: 640px;
+}
+
+.verify-result-top {
+  margin-bottom: 12px;
+}
+
+.verify-result-hypothesis {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text);
+  opacity: 0.8;
+  margin-bottom: 10px;
+}
+
+.verify-result-hypothesis span {
+  color: var(--text-h);
+  opacity: 1;
+}

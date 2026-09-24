@@ -5,11 +5,13 @@ import About from "./pages/About";
 import Home from "./pages/Home";
 import HowItWorks from "./pages/HowItWorks";
 import Research from "./pages/Research";
+import VerifySource from "./pages/VerifySource";
 import "./App.css";
 
 const NAV = [
   { to: "/", label: "home", end: true },
   { to: "/research", label: "research" },
+  { to: "/verify", label: "verify" },
   { to: "/how-it-works", label: "how-it-works" },
   { to: "/about", label: "about" },
 ];
@@ -47,6 +49,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/research" element={<Research />} />
+          <Route path="/verify" element={<VerifySource />} />
           <Route path="/how-it-works" element={<HowItWorks />} />
           <Route path="/about" element={<About />} />
           <Route path="*" element={<Home />} />

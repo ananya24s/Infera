@@ -68,6 +68,24 @@ class PaperStance(BaseModel):
     evidence_sentence: str = ""
 
 
+class SingleSourceRequest(BaseModel):
+    """Check one pasted source against a hypothesis, outside the full research
+    pipeline — no retrieval, no report, just the same NLI stance check the
+    pipeline runs per-paper."""
+
+    source_text: str
+    hypothesis: str = ""
+    # Used to derive `hypothesis` (rule-based, no LLM) when it's left blank.
+    question: str = ""
+
+
+class SingleSourceResult(BaseModel):
+    hypothesis: str
+    label: VerificationLabel
+    confidence: float
+    evidence_sentence: str = ""
+
+
 class Verdict(BaseModel):
     """Two independent checks on an extracted claim."""
 

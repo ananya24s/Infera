@@ -39,6 +39,7 @@ def main() -> None:
 
     import numpy as np
     import torch
+    from torch import nn
     from transformers import (
         AutoModelForSequenceClassification,
         AutoTokenizer,
@@ -49,6 +50,16 @@ def main() -> None:
     train_examples = load_examples("train")
     val_examples = load_examples("dev")
     print(f"train={len(train_examples)} val={len(val_examples)}")
+
+    # SciFact's train split is skewed toward entailment/neutral and has roughly
+    # half as many contradiction examples (reproduced: 370/355/194 for
+    # entailment/neutral/contradiction) — training with plain cross-entropy
+    # taught the model to under-predict contradiction, regressing REFUTES
+    # accuracy even as overall accuracy improved. Inverse-frequency class
+    # weights counteract that by penalizing contradiction mistakes more.
+    label_counts = np.array([sum(e.label == label for e in train_examples) for label in LABEL_LIST])
+    class_weights = torch.tensor(len(train_examples) / (len(LABEL_LIST) * label_counts), dtype=torch.float32)
+    print(f"class weights ({LABEL_LIST}): {class_weights.tolist()}")
 
     tokenizer = AutoTokenizer.from_pretrained(args.base_model)
     model = AutoModelForSequenceClassification.from_pretrained(
@@ -114,7 +125,15 @@ def main() -> None:
         report_to=[],
     )
 
-    trainer = Trainer(
+    class WeightedTrainer(Trainer):
+        def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
+            labels = inputs.pop("labels")
+            outputs = model(**inputs)
+            weight = class_weights.to(device=outputs.logits.device, dtype=outputs.logits.dtype)
+            loss = nn.functional.cross_entropy(outputs.logits, labels, weight=weight)
+            return (loss, outputs) if return_outputs else loss
+
+    trainer = WeightedTrainer(
         model=model,
         args=training_args,
         train_dataset=train_ds,

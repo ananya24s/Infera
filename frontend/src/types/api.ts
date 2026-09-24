@@ -139,3 +139,16 @@ export interface Health {
   status: string;
   llm: string;
 }
+
+export interface SingleSourceRequest {
+  source_text: string;
+  hypothesis?: string;
+  question?: string;
+}
+
+export interface SingleSourceResult {
+  hypothesis: string;
+  label: VerificationLabel;
+  confidence: number;
+  evidence_sentence: string;
+}
