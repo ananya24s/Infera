@@ -6,6 +6,20 @@ task calls for judgment, and an LLM only where the task is pure language
 (phrasing, segmentation) — and returns a consensus-scored report with a
 supporting/contradicting evidence graph.
 
+## Screenshots
+
+**Home — a real captured report output**
+![Home](docs/screenshots/home.png)
+
+**Pipeline overview**
+![How it works](docs/screenshots/how-it-works.png)
+
+**Ask a research question**
+![Research](docs/screenshots/research.png)
+
+**Single-source check — verify one pasted source against a hypothesis, no retrieval needed**
+![Single-source check](docs/screenshots/verify.png)
+
 ## Pipeline
 
 ```
