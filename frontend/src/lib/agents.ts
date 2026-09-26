@@ -42,7 +42,7 @@ export const AGENTS: AgentInfo[] = [
     kind: "model",
     title: "Verification",
     what: "Labels each claim SUPPORTS, REFUTES or NOT ENOUGH INFO against its source.",
-    how: "NLI model (DeBERTa-v3, FEVER/MNLI/ANLI-trained). A SciFact fine-tune is planned.",
+    how: "NLI model (DeBERTa-v3), fine-tuned on real SciFact data with a class-weighted loss.",
   },
   {
     name: "stance_clustering",

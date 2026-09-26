@@ -37,8 +37,14 @@ async def lifespan(_app: FastAPI):
 
     logger.info("Warming up models...")
     get_pipeline()
-    await asyncio.to_thread(nli_model.warmup)
-    await asyncio.to_thread(hybrid_search.warmup)
+    # Plain synchronous calls, not asyncio.to_thread: SentenceTransformer's
+    # loading is not thread-safe in this environment — instantiating it off
+    # the main thread reproducibly leaves it broken (`self[0]` stays None
+    # inside its internal Transformer wrapper), regardless of what else has
+    # or hasn't loaded yet. Blocking startup briefly here is an accepted
+    # tradeoff already (see this function's docstring on cold-start cost).
+    hybrid_search.warmup()
+    nli_model.warmup()
     logger.info("Model warmup complete.")
     yield
 

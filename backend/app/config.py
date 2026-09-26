@@ -49,19 +49,22 @@ class Settings(BaseModel):
     ollama_keep_alive: str = os.getenv("INFERA_OLLAMA_KEEP_ALIVE") or "20s"
 
     # Trained-model checkpoints
-    nli_model_name: str = os.getenv(
-        "INFERA_NLI_MODEL",
+    # `or default` matters here too (see the comment on openalex_contact_email
+    # above): a blank line in .env (e.g. INFERA_EMBEDDING_MODEL=) loads as ""
+    # rather than absent, and os.getenv's positional default only applies when
+    # the var is entirely unset — plain positional defaults here would load
+    # SentenceTransformer("") / an empty NLI model id and fail in confusing
+    # ways far from this file (reproduced: sentence-transformers silently
+    # leaves its internal module empty, "'NoneType' object has no attribute
+    # 'parameters'" three layers down in a completely unrelated warmup call).
+    nli_model_name: str = os.getenv("INFERA_NLI_MODEL") or (
         # Default: a strong FEVER/fact-verification-trained NLI checkpoint.
         # Fine-tune on SciFact via backend/training/train_nli.py and point this at the
         # resulting checkpoint directory for domain-specific scientific claim verification.
-        "MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli",
+        "MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli"
     )
-    embedding_model_name: str = os.getenv(
-        "INFERA_EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2"
-    )
-    ranker_model_path: str = os.getenv(
-        "INFERA_RANKER_PATH", "backend/training/data/ranker.lgb"
-    )
+    embedding_model_name: str = os.getenv("INFERA_EMBEDDING_MODEL") or "sentence-transformers/all-MiniLM-L6-v2"
+    ranker_model_path: str = os.getenv("INFERA_RANKER_PATH") or "backend/training/data/ranker.lgb"
 
     max_retrieval_per_query: int = 40
     max_claims_per_paper: int = 6
