@@ -35,6 +35,7 @@ def main() -> None:
     parser.add_argument("--batch_size", type=int, default=8)
     parser.add_argument("--lr", type=float, default=1e-5)
     parser.add_argument("--max_length", type=int, default=256)
+    parser.add_argument("--max_steps", type=int, default=-1, help="override epochs with a hard step cap (smoke tests)")
     args = parser.parse_args()
 
     import numpy as np
@@ -111,17 +112,21 @@ def main() -> None:
         # epoch) — force CPU, which is slower but numerically correct.
         use_cpu=True,
         num_train_epochs=args.epochs,
+        max_steps=args.max_steps,
         per_device_train_batch_size=args.batch_size,
         per_device_eval_batch_size=args.batch_size,
         learning_rate=args.lr,
         warmup_steps=warmup_steps,
         weight_decay=0.01,
-        eval_strategy="epoch",
-        save_strategy="epoch",
+        # A --max_steps smoke test won't run long enough to hit an epoch
+        # boundary, so skip eval/save/best-model-tracking entirely then —
+        # otherwise load_best_model_at_end errors with no checkpoint saved.
+        eval_strategy="no" if args.max_steps > 0 else "epoch",
+        save_strategy="no" if args.max_steps > 0 else "epoch",
         save_total_limit=2,
-        load_best_model_at_end=True,
-        metric_for_best_model="macro_f1",
-        logging_steps=20,
+        load_best_model_at_end=args.max_steps <= 0,
+        metric_for_best_model="macro_f1" if args.max_steps <= 0 else None,
+        logging_steps=1 if args.max_steps > 0 else 20,
         report_to=[],
     )
 
@@ -142,6 +147,10 @@ def main() -> None:
         compute_metrics=compute_metrics,
     )
     trainer.train()
+    if args.max_steps > 0:
+        print(f"\nSmoke test done ({args.max_steps} steps) — nothing saved, this run was just for timing.")
+        return
+
     metrics = trainer.evaluate()
     print("Final eval:", metrics)
 

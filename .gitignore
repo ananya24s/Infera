@@ -8,4 +8,5 @@ dist/
 .DS_Store
 backend/training/data/*
 !backend/training/data/.gitkeep
+backend/data/
 .claude/
