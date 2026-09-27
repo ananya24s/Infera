@@ -72,15 +72,13 @@ export default function KnowledgeGraphView({ graph }: { graph: KnowledgeGraph })
           style: {
             "background-color": "#f08c00",
             shape: "round-rectangle",
-            label: "data(label)",
-            "font-size": 9,
+            // Claims outnumber papers 2:1, and their full text is already in
+            // the "claims" tab — labeling every one here is what made the
+            // graph look text-heavy. Left as plain colored squares; the
+            // shape/color still shows how claims cluster around papers and
+            // hypotheses.
             width: 14,
             height: 14,
-            color: "#e6f5ec",
-            "text-outline-color": "#0a0b0d",
-            "text-outline-width": 2,
-            "text-wrap": "wrap",
-            "text-max-width": "70px",
           },
         },
         {
