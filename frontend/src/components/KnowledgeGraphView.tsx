@@ -103,7 +103,7 @@ export default function KnowledgeGraphView({ graph }: { graph: KnowledgeGraph })
           style: { "target-arrow-shape": "none", opacity: 0.35 },
         },
       ],
-      layout: { name: "cose-bilkent", animate: false, fit: true, padding: 40 } as cytoscape.LayoutOptions,
+      layout: { name: "cose-bilkent", animate: false } as cytoscape.LayoutOptions,
     });
 
     return () => cy.destroy();
