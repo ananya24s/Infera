@@ -9,6 +9,14 @@ import type {
 
 export const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8001";
 
+// The deployed backend is tunneled through ngrok's free tier, which shows a
+// browser-interstitial warning page to any request that looks like it came
+// from a browser (no such header) — including our own fetch() calls, which
+// then fail CORS since the interstitial page has no CORS headers at all.
+// This header is ngrok's documented bypass for exactly that case; it's a
+// no-op against a plain localhost backend.
+const NGROK_HEADERS = { "ngrok-skip-browser-warning": "true" };
+
 export interface StreamHandlers {
   onTrace: (t: AgentTrace) => void;
   onResult: (r: ResearchResponse) => void;
@@ -50,7 +58,7 @@ export async function streamResearch(
   try {
     res = await fetch(`${API_BASE}/api/research/stream`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...NGROK_HEADERS },
       body: JSON.stringify(req),
       signal,
     });
@@ -78,7 +86,7 @@ export async function streamResearch(
 }
 
 export async function fetchHealth(): Promise<Health> {
-  const res = await fetch(`${API_BASE}/health`);
+  const res = await fetch(`${API_BASE}/health`, { headers: NGROK_HEADERS });
   if (!res.ok) throw new Error(`health ${res.status}`);
   return res.json();
 }
@@ -88,7 +96,7 @@ export async function verifySource(req: SingleSourceRequest): Promise<SingleSour
   try {
     res = await fetch(`${API_BASE}/api/verify-source`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...NGROK_HEADERS },
       body: JSON.stringify(req),
     });
   } catch {
